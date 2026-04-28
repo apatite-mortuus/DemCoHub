@@ -17,6 +17,7 @@ class User(SqlAlchemyBase, UserMixin):
     likes = orm.relationship("Likes", back_populates="user")
     dislikes = orm.relationship("Dislikes", back_populates="user")
     repositories = orm.relationship("Repositories", back_populates="user")
+    buffer = orm.relationship("Buffers", back_populates="user")
     coauthorship = orm.relationship("Repositories",
                                   secondary="repositories_to_users",
                                   backref="users")

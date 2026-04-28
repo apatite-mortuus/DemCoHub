@@ -7,29 +7,522 @@
     <tbody>
     {% for pos in dr %}
     <tr class="table-secondary">
-        <td><a {% if not pos[1]
-               %}href="/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}?folders={{ folders }}{{ pos[0] }}"
-               {% endif %}>{{ pos[0] }}</a></td>
+        <td><a {% if not pos[1] %}href="
+                {% if commit != 'buffer' %}/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/{%
+            else %}/buffer/{% endif %}{{ (folders + [pos[0]]) | join('/') }}"{% endif %}>{{ pos[0] }}</a></td>
+        <td>
+            <button class="delete-file-btn btn-danger" data-filename="{{ pos[0] }}">Удалить</button>
+        </td>
     </tr>
     {% endfor %}
     </tbody>
 </table>
+
 <button onclick="document.getElementById('fileInput').click();">Загрузить новый файл</button>
 <input type="file" id="fileInput" hidden onchange="handleFiles(this.files)">
-<a href="/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/create_commit">Совершить коммит</a>
+<a href="/create_commit">Совершить коммит</a>
+
+<!-- Модальное окно -->
+<div id="deleteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Подтверждение удаления</h3>
+            <span class="close-btn">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Вы уверены, что хотите удалить файл <strong id="fileNameToDelete"></strong>?</p>
+            <p class="warning-text">Это действие необратимо.</p>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelDeleteBtn" class="btn-secondary">Отмена</button>
+            <button id="confirmDeleteBtn" class="btn-danger">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для коммита -->
+<div id="commitModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Совершить коммит</h3>
+            <span class="close-commit-btn">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="commitForm">
+                <div class="form-group">
+                    <label for="commitMessage">Описание коммита:</label>
+                    <textarea id="commitMessage" name="message" rows="4"
+                              placeholder="Введите описание изменений..."
+                              required></textarea>
+                    <small class="form-text">Опишите, какие изменения были внесены</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="commitAuthor">Автор (опционально):</label>
+                    <input type="text" id="commitAuthor" name="author"
+                           placeholder="Ваше имя" value="{{ nickname }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="commitAllChanges" checked>
+                        Зафиксировать все изменения
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelCommitBtn" class="btn-secondary">Отмена</button>
+            <button id="confirmCommitBtn" class="btn-success">Отправить коммит</button>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    /* Стили для модальных окон */
+    .modal {
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        animation: fadeIn 0.3s;
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: 10% auto;
+        border: 1px solid #888;
+        width: 80%;
+        max-width: 550px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        animation: slideDown 0.3s;
+    }
+
+    .modal-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        color: #333;
+    }
+
+    .close-btn, .close-commit-btn {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    .close-btn:hover, .close-commit-btn:hover {
+        color: #000;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-body p {
+        margin: 10px 0;
+    }
+
+    .warning-text {
+        color: #d9534f;
+        font-size: 14px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    #commitMessage {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 14px;
+        resize: vertical;
+        box-sizing: border-box;
+    }
+
+    #commitMessage:focus {
+        outline: none;
+        border-color: #5cb85c;
+        box-shadow: 0 0 5px rgba(92, 184, 92, 0.3);
+    }
+
+    #commitAuthor {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    #commitAuthor:focus {
+        outline: none;
+        border-color: #5cb85c;
+    }
+
+    .form-text {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+        display: block;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-weight: normal !important;
+    }
+
+    .checkbox-label input {
+        margin-right: 8px;
+        width: auto;
+    }
+
+    .modal-footer {
+        padding: 15px 20px;
+        border-top: 1px solid #ddd;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .btn-secondary:hover {
+        background-color: #5a6268;
+    }
+
+    .btn-danger {
+        background-color: #d9534f;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .btn-danger:hover {
+        background-color: #c9302c;
+    }
+
+    .btn-danger:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-success {
+        background-color: #5cb85c;
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .btn-success:hover {
+        background-color: #4cae4c;
+    }
+
+    .btn-success:disabled {
+        background-color: #5cb85c;
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideDown {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    /* Стили для индикатора загрузки */
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #fff;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
 <script>
+    let currentFileName = null;
+    let isDeleting = false;
+    let isCommitting = false;
+
+    const modal = document.getElementById('deleteModal');
+    const fileNameSpan = document.getElementById('fileNameToDelete');
+    const closeBtn = document.querySelector('.close-btn');
+    const cancelBtn = document.getElementById('cancelDeleteBtn');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+    // Функция для закрытия модального окна
+    function closeModal() {
+        modal.style.display = 'none';
+        currentFileName = null;
+    }
+
+    // Открыть модальное окно при клике на "Удалить"
+    document.querySelectorAll('.delete-file-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Сбрасываем состояние кнопки подтверждения
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Удалить';
+            }
+
+            currentFileName = this.getAttribute('data-filename');
+            fileNameSpan.textContent = currentFileName;
+            modal.style.display = 'block';
+        });
+    });
+
+    // Закрыть модальное окно
+    closeBtn.onclick = function() {
+        closeModal();
+    };
+
+    cancelBtn.onclick = function() {
+        closeModal();
+    };
+
+    // Подтверждение удаления
+    confirmBtn.onclick = function() {
+        if (currentFileName) {
+            isDeleting = true;
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Удаление...';
+
+            let xhr = new XMLHttpRequest();
+            {% if commit == "buffer" %}
+                xhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", true);
+                xhr.send();
+                xhr = new XMLHttpRequest();
+            {% endif %}
+
+            xhr = new XMLHttpRequest();
+            let formData = new FormData();
+            formData.append("name", currentFileName);
+            {% if folders %}
+                xhr.open("DELETE", "/{{ folders | join("/") }}/delete_file", true);
+            {% else %}
+                xhr.open("DELETE", "/delete_file", true);
+            {% endif %}
+            xhr.send(formData);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    window.location.reload();
+                    // Сбрасываем флаг и разблокируем кнопку
+                    isDeleting = false;
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'Удалить';
+                    }
+                }
+            };
+            closeModal();
+        }
+    };
+
+
+        // ========== МОДАЛЬНОЕ ОКНО ДЛЯ КОММИТА ==========
+    const commitModal = document.getElementById('commitModal');
+    const commitBtn = document.getElementById('commitBtn');
+    const closeCommitBtn = document.querySelector('.close-commit-btn');
+    const cancelCommitBtn = document.getElementById('cancelCommitBtn');
+    const confirmCommitBtn = document.getElementById('confirmCommitBtn');
+    const commitMessage = document.getElementById('commitMessage');
+    const commitAuthor = document.getElementById('commitAuthor');
+    const commitAllChanges = document.getElementById('commitAllChanges');
+
+    // Открыть модальное окно коммита
+    if (commitBtn) {
+        commitBtn.onclick = function(e) {
+            e.preventDefault();
+            // Очищаем форму
+            if (commitMessage) commitMessage.value = '';
+            if (commitAuthor) commitAuthor.value = "{{ nickname }}";
+            if (commitAllChanges) commitAllChanges.checked = true;
+
+            // Сбрасываем состояние кнопки
+            if (confirmCommitBtn) {
+                confirmCommitBtn.disabled = false;
+                confirmCommitBtn.textContent = 'Отправить коммит';
+            }
+
+            commitModal.style.display = 'block';
+            // Фокусируемся на поле ввода сообщения
+            if (commitMessage) commitMessage.focus();
+        };
+    }
+
+    // Закрыть модальное окно коммита
+    function closeCommitModal() {
+        commitModal.style.display = 'none';
+        isCommitting = false;
+    }
+
+    if (closeCommitBtn) closeCommitBtn.onclick = closeCommitModal;
+    if (cancelCommitBtn) cancelCommitBtn.onclick = closeCommitModal;
+
+    // Отправка коммита
+    if (confirmCommitBtn) {
+        confirmCommitBtn.onclick = function() {
+            if (isCommitting) return;
+
+            const message = commitMessage ? commitMessage.value.trim() : '';
+
+            if (!message) {
+                alert('Пожалуйста, введите описание коммита');
+                commitMessage.focus();
+                return;
+            }
+
+            isCommitting = true;
+            confirmCommitBtn.disabled = true;
+            confirmCommitBtn.innerHTML = '<span class="spinner"></span> Отправка...';
+
+            // Собираем данные для отправки
+            const commitData = {
+                message: message,
+                author: commitAuthor ? commitAuthor.value.trim() : "{{ nickname }}",
+                commit_all: commitAllChanges ? commitAllChanges.checked : true
+            };
+
+            // Отправляем POST запрос на сервер
+            let xhr = new XMLHttpRequest();
+            let url = "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/create_commit";
+
+            xhr.open("POST", url, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    isCommitting = false;
+
+                    if (xhr.status === 200) {
+                        // Успешный коммит
+                        const response = JSON.parse(xhr.responseText);
+                        alert('Коммит успешно создан!');
+                        // Перенаправляем на страницу с новым коммитом
+                        if (response.commit_hash) {
+                            window.location.href = "/{{ nickname }}/repositories/{{ repository }}/" + response.branch + "/" + response.commit_hash;
+                        } else {
+                            location.reload();
+                        }
+                    } else if (xhr.status === 400) {
+                        const response = JSON.parse(xhr.responseText);
+                        alert('Ошибка: ' + (response.message || 'Некорректные данные'));
+                        confirmCommitBtn.disabled = false;
+                        confirmCommitBtn.textContent = 'Отправить коммит';
+                    } else {
+                        alert('Ошибка при создании коммита: ' + (xhr.statusText || 'Неизвестная ошибка'));
+                        confirmCommitBtn.disabled = false;
+                        confirmCommitBtn.textContent = 'Отправить коммит';
+                    }
+                }
+            };
+
+            xhr.onerror = function() {
+                alert('Ошибка сети при создании коммита');
+                isCommitting = false;
+                confirmCommitBtn.disabled = false;
+                confirmCommitBtn.textContent = 'Отправить коммит';
+            };
+
+            xhr.send(JSON.stringify(commitData));
+        };
+    }
+
+    // Закрытие модальных окон при клике вне их области
+    window.onclick = function(event) {
+        if (event.target === deleteModal) {
+            closeDeleteModal();
+        }
+        if (event.target === commitModal) {
+            closeCommitModal();
+        }
+    };
+
     function handleFiles(files) {
         for (const file of files) {
             let xhr = new XMLHttpRequest();
+            {% if commit == "buffer" %}
+                xhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", true);
+                xhr.send();
+                xhr = new XMLHttpRequest();
+            {% endif %}
             let formData = new FormData();
             formData.append("name", file.name);
-            console.log(file);
-            let reader = new FileReader();
-            reader.readAsText(file);
-            reader.onload = function() {
-                formData.append("file", reader.result);
-                xhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}{% if folders %}?folders={{ folders }}{% endif %}", true);
-                xhr.send(formData);
+            formData.append("file", file);
+            {% if folders %}
+                xhr.open("POST", "/{{ folders | join("/") }}/post_file", true);
+            {% else %}
+                xhr.open("POST", "/post_file", true);
+            {% endif %}
+            xhr.send(formData);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4) {
+                    {% if commit != "buffer" %}
+                        window.location.href = "/buffer";
+                    {% endif %}
+                    window.location.reload()
+                }
             };
         }
     }

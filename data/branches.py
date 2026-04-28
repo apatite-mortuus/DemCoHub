@@ -11,6 +11,7 @@ class Branches(SqlAlchemyBase):
     repository_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("repositories.id"), nullable=True)
     title = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     repository = orm.relationship("Repositories")
+    buffers = orm.relationship("Buffers", back_populates="branch")
     commits = orm.relationship("Commits",
                                     secondary="commits_to_branches",
                                     backref="branches")

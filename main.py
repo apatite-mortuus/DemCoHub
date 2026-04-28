@@ -15,6 +15,7 @@ from data.dislikes import Dislikes
 from data.repositories import Repositories
 from data.branches import Branches
 from data.commits import Commits
+from data.buffers import Buffers
 from data import db_session
 from forms.login_form import LoginForm
 from forms.register_form import RegisterForm
@@ -245,7 +246,8 @@ def show_repository(nickname, repository):
 @app.route("/<nickname>/repositories/<repository>/<branch>")
 def show_branch(nickname, repository, branch):
     db_sess = db_session.create_session()
-    commits = db_sess.query(Commits).select_from(Branches).join(Branches.commits).filter(Branches.title == branch).all()
+    br = db_sess.query(Branches).filter(Branches.title == branch).first()
+    commits = br.commits
     print(commits, "AAAAA")
     if not current_user.is_authenticated or current_user.nickname != nickname:
         return abort(403)
@@ -277,54 +279,100 @@ def create_branch(repository):
     return render_template("branch_form.html", title="Создание ветки | DemCoHub", form=form)
 
 
-@app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>", methods=["GET", "POST"])
-def show_commit(nickname, repository, branch, sha1):
+@app.route("/<nickname>/repositories/<repository>/<branch>/sha1/<path:folders>")
+@app.route("/<nickname>/repositories/<repository>/<branch>/sha1", defaults={"folders": None})
+def show_commit(nickname, repository, branch, sha1, folders):
     # if not current_user.is_authenticated or current_user.nickname != nickname:
     #     return abort(403)
     db_sess = db_session.create_session()
-    folders = request.args.get("folders")
-    if folders:
-        folders = folders.split()
-    else:
-        folders = []
-    path = f"static/upload/users/{nickname}/repositories/{repository}/buffer/"
-    if request.method == "POST":
-        if not os.path.exists(path):
-            pathlib.Path(path).mkdir(exist_ok=True, parents=True)
-            commit = db_sess.query(Commits).filter(Commits.sha1 == sha1).first()
-            shutil.copytree(commit.path, path, dirs_exist_ok=True)
-        with open(path + "/".join(folders) + "/" + request.form["name"], "w", encoding="utf-8") as f:
-            f.write(request.form["file"])
-    if os.path.exists(path):
-        dr = [(i, os.path.isfile(path + "/" + "/".join(folders + [i]))) for i in
-              os.listdir(path + "/" + "/".join(folders))]
-        return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
-                               commit="buffer", dr=dr, folders=("+".join(folders) + "+") if folders else "",
-                               title="buffer | DemCoHub")
-    else:
-        commit = db_sess.query(Commits).filter(Commits.sha1 == sha1).first()
-        dr = [(i, os.path.isfile(commit.path + "/" + "/".join(folders + [i]))) for i in
-              os.listdir(commit.path + "/" + "/".join(folders))]
-        return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
-                               commit=commit.sha1, dr=dr, folders=("+".join(folders) + "+") if folders else "",
-                               title=f"{commit.sha1[:7]} | DemCoHub")
+    folders = folders.split("/") if folders else []
+    print(sha1, folders)
+    path = f"static/upload/users/{nickname}/buffer/"
+    commit = db_sess.query(Commits).filter(Commits.sha1 == sha1).first()
+    dr = [(i, os.path.isfile(commit.path + "/" + "/".join(folders + [i]))) for i in
+          os.listdir(commit.path + "/" + "/".join(folders))]
+    return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
+                           commit=commit.sha1, dr=dr, folders=folders,
+                           title=f"{commit.sha1[:7]} | DemCoHub")
 
 
-@app.route("/<nickname>/repositories/<repository>/<branch>/create_commit")
-def create_commit(nickname, repository, branch):
-    if not current_user.is_authenticated or current_user.nickname != nickname:
-        return abort(403)
+@app.route("/<path:folders>/post_file", methods=["POST"])
+@app.route("/post_file", defaults={"folders": None}, methods=["POST"])
+def post_file(folders):
+    folders = folders.split("/") if folders else []
+    path = f"static/upload/users/{current_user.nickname}/buffer/"
+    request.files["file"].save(path + "/".join(folders + [request.form["name"]]))
+    return redirect(url_for("show_buffer"))
+
+
+@app.route("/<path:folders>/delete_file", methods=["DELETE"])
+@app.route("/delete_file", defaults={"folders": None}, methods=["DELETE"])
+def delete_file(folders):
+    folders = folders.split("/") if folders else []
+    path = f"static/upload/users/{current_user.nickname}/buffer/"
+    os.remove(path + "/".join(folders + [request.form["name"]]))
+    return redirect(url_for("show_buffer"))
+
+
+@app.route("/buffer/<path:folders>")
+@app.route("/buffer", defaults={"folders": None})
+def show_buffer(folders):
     db_sess = db_session.create_session()
+    buffer = db_sess.query(Buffers).join(Buffers.user).filter(User.id == current_user.id).first()
+    nickname = buffer.user.nickname
+    branch = buffer.branch.title
+    repository = buffer.branch.repository.title
+    folders = folders.split("/") if folders else []
+    path = f"static/upload/users/{nickname}/buffer/"
+    dr = [(i, os.path.isfile(path + "/" + "/".join(folders + [i]))) for i in
+          os.listdir(path + "/".join(folders))]
+    return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
+                           commit="buffer", dr=dr, folders=folders,
+                           title="buffer | DemCoHub")
+
+
+@app.route("/create_commit")
+def create_commit():
+    # if not current_user.is_authenticated or current_user.nickname != nickname:
+    #     return abort(403)
+    db_sess = db_session.create_session()
+    buffer = db_sess.query(Buffers).join(Buffers.user_id).filter(User.id == current_user.id).first()
+    nickname = buffer.user.nickname
+    branch = buffer.branch.title
+    repository = buffer.branch.repository.title
     branches = db_sess.query(Branches).join(Branches.repository).filter(Repositories.title == repository).all()
     commit = Commits(
-        description="",
+        description=None,
         path=f"static/upload/users/{nickname}/repositories/{repository}/commits/",
         date_time=datetime.datetime.now()
     )
     commit.sha1 = hashlib.sha1((str(commit.date_time) + commit.path + commit.description).encode()).hexdigest()
     commit.path += commit.sha1[:7]
-    shutil.copytree(f"static/upload/users/{nickname}/repositories/{repository}/buffer/",
+    shutil.copytree(f"static/upload/users/{nickname}/buffer/",
                     f"static/upload/users/{nickname}/repositories/{repository}/commits/{commit.sha1[:7]}")
+
+
+@app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/create_buffer", methods=["POST"])
+def create_buffer(nickname, repository, branch, sha1):
+    db_sess = db_session.create_session()
+    path = f"static/upload/users/{nickname}/buffer/"
+    if not os.path.exists(path):
+        pathlib.Path(path).mkdir(exist_ok=True, parents=True)
+        commit = db_sess.query(Commits).filter(Commits.sha1 == sha1).first()
+        shutil.copytree(commit.path, path, dirs_exist_ok=True)
+        buffer = Buffers(
+            user_id=db_sess.query(User).filter(User.nickname == nickname).first().id,
+            branch_id=db_sess.query(Branches).filter(Branches.title == branch).first().id
+        )
+        db_sess.add(buffer)
+        db_sess.commit()
+    return jsonify({"status": "OK"})
+
+
+def get_folders(folders):
+    if folders:
+        return folders.split()
+    return []
 
 
 # @app.route('/download/<filename>')
