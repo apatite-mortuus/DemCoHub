@@ -3,7 +3,7 @@
 {% block content %}
 
 <p>
-    <a class="btn btn-primary" href="/create_branch">Создать новую ветку</a>
+    <a class="btn btn-primary" href="{{ url_for('create_branch', repository=branches[0].repository.title) }}">Создать новую ветку</a>
 </p>
 
 <h1>Ветки в репозитории {{ branches[0].repository.title }}</h1>

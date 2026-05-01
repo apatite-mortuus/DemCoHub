@@ -3,7 +3,7 @@
 {% block content %}
 
 <p>
-    <a class="btn btn-primary" href="/create_repository">Создать новый репозиторий</a>
+    <a class="btn btn-primary" href="{{ url_for('create_repository') }}">Создать новый репозиторий</a>
 </p>
 
 <h1>Репозитории пользователя:</h1>
@@ -17,7 +17,7 @@
     <tbody>
     {% for repo in repos %}
     <tr class="table-secondary">
-        <td><a href="/{{ repo.user.nickname }}/repositories/{{ repo.title }}">{{ repo.title }}</a></td>
+        <td><a href="{{ url_for('show_repository', nickname=repo.user.nickname, repository=repo.title) }}">{{ repo.title }}</a></td>
         <td>{{ repo.description }}</td>
     </tr>
     {% endfor %}

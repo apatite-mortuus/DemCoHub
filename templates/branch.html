@@ -7,7 +7,7 @@
     <tbody>
     {% for commit in commits %}
     <tr class="table-secondary">
-        <td><a href="/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit.sha1 }}">{{
+        <td><a href="{{ url_for('show_commit', nickname=nickname, repository=repository, branch=branch, sha1=commit.sha1) }}">{{
                 commit.description }}</a></td>
         <td>{{ commit.sha1 }}</td>
         <td>{{ commit.date_time }}</td>

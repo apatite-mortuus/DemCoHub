@@ -4,7 +4,7 @@
 
 {% if current_user.is_authenticated %}
 <p>
-    <a class="btn btn-primary" href="/post_audio">Опубликовать новую аудиозапись</a>
+    <a class="btn btn-primary" href="{{ url_for('post_audio') }}">Опубликовать новую аудиозапись</a>
 </p>
 {% endif %}
 
@@ -39,8 +39,8 @@
             </button>
             {% if current_user.is_authenticated and current_user.id == file.posted %}
             <div>
-                <a href="/audio_delete/{{ file.id }}" class="btn btn-danger">
-                    Delete
+                <a href="{{ url_for('audio_delete', id=file.id) }}" class="btn btn-danger">
+                    Удалить
                 </a>
             </div>
             {% endif %}
@@ -50,37 +50,4 @@
     </tbody>
 </table>
 
-<script>
-    const likeBtn = document.querySelectorAll(".like");
-    likeBtn.forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-        let xhr = new XMLHttpRequest();
-        let formData = new FormData();
-        formData.append("id", btn.dataset.id);
-        xhr.open("POST", "/like");
-        xhr.send(formData);
-        xhr.onload = function() {
-        if (JSON.parse(xhr.response).response == "created") {
-            btn.textContent = `like ${(parseInt(btn.textContent.split(" ")[1]) + 1)}`;
-        } else {
-            btn.textContent = `like ${(parseInt(btn.textContent.split(" ")[1]) - 1)}`;
-        }};
-    })});
-    const dislikeBtn = document.querySelectorAll(".dislike");
-    dislikeBtn.forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-        let xhr = new XMLHttpRequest();
-        let formData = new FormData();
-        formData.append("id", btn.dataset.id);
-        xhr.open("POST", "/dislike");
-        xhr.send(formData);
-        xhr.onload = function() {
-        console.log(JSON.parse(xhr.response).response);
-        if (JSON.parse(xhr.response).response == "created") {
-            btn.textContent = `dislike ${(parseInt(btn.textContent.split(" ")[1]) + 1)}`;
-        } else {
-            btn.textContent = `dislike ${(parseInt(btn.textContent.split(" ")[1]) - 1)}`;
-        }};
-    })});
-</script>
 {% endblock %}
