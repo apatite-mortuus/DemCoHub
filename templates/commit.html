@@ -82,7 +82,7 @@
         </button>
         <input type="file" id="fileInput" hidden multiple>
 
-        <button class="btn-action btn-commit" id="commitBtn">
+        <button class="btn-action btn-commit" id="commitBtn" {% if not buffer %} disabled {% endif %}>
             <i class="bi bi-git-commit"></i> Совершить коммит
         </button>
 

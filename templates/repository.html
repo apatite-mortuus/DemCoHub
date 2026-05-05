@@ -15,11 +15,13 @@
     <a class="btn btn-primary" href="{{ url_for('create_branch', repository=branches[0].repository.title) }}">Создать
         новую ветку</a>
 </p>
+{% if nickname == current_user.nickname %}
 <p>
     <a class="btn btn-primary" href="{{ url_for('add_to_repository', repository=branches[0].repository.title) }}">Добавить
         пользователя в
         репозиторий</a>
 </p>
+{% endif %}
 
 <h1>Ветки в репозитории {{ branches[0].repository.title }}</h1>
 <div class="table-responsive">

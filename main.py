@@ -37,8 +37,8 @@ def load_user(user_id):
         return db_sess.get(User, user_id)
 
 
-@app.route("/")
 @app.route("/index")
+@app.route("/")
 def index():
     with db_session.create_session() as db_sess:
         files = db_sess.query(Audiofile).all()
@@ -310,24 +310,23 @@ def show_branch(nickname, repository, branch):
 def create_branch(repository):
     with db_session.create_session() as db_sess:
         form = BranchForm()
-        form.parent.choices = [b.title for b in
-                               db_sess.query(Branches).join(Branches.repository).join(Repositories.user).filter(
-                                   User.id == current_user.id, Repositories.title == repository).all()]
+        repo = db_sess.query(Repositories).filter(Repositories.title == repository).first()
+        form.parent.choices = [b.title for b in repo.branches]
         if form.validate_on_submit():
-            if db_sess.query(Branches).join(Branches.repository).join(Repositories.user).filter(
-                    Branches.title == form.title.data,
-                    User.id == current_user.id).first():
+            if db_sess.query(Branches).filter(
+                    Branches.title == form.title.data, Branches.repository_id == repo.id).first():
                 return render_template("branch_form.html", title="Создание ветки | DemCoHub",
-                                       form=form, message="Ветка с таким именем уже существует", repository=repository)
+                                       form=form, message="Ветка с таким именем уже существует", repository=repo)
             branch = Branches(
                 title=form.title.data,
-                repository_id=db_sess.query(Repositories.id).filter(Repositories.id == repository).first(),
-                commits=db_sess.query(Branches.commits).filter(Branches.title == form.parent.data).first()
+                repository_id=repo.id,
+                commits=db_sess.query(Branches).filter(Branches.title == form.parent.data,
+                                                    Branches.repository_id == repo.id).first().commits
             )
             db_sess.add(branch)
             db_sess.commit()
-            return redirect(f"/{current_user.nickname}/repositories/{repository}")
-        return render_template("branch_form.html", title="Создание ветки | DemCoHub", form=form, repository=repository)
+            return redirect(f"/{repo.user.nickname}/repositories/{repository}")
+        return render_template("branch_form.html", title="Создание ветки | DemCoHub", form=form, repository=repo)
 
 
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/<path:folders>")
@@ -514,26 +513,25 @@ def download_folder(nickname, repository, branch, sha1, folders, filename):
 def page_not_found(error):
     return render_template('errors/404.html', title="404 | DemCoHub"), 404
 
+
 @app.errorhandler(403)
 def forbidden(error):
     return render_template('errors/403.html', title="403 | DemCoHub"), 403
+
 
 @app.errorhandler(500)
 def internal_server_error(error):
     return render_template('errors/500.html', title="500 | DemCoHub"), 500
 
+
 @app.errorhandler(400)
 def bad_request(error):
     return render_template('errors/400.html', title="400 | DemCoHub"), 400
 
+
 @app.errorhandler(401)
 def unauthorized(error):
     return render_template('errors/401.html', title="401 | DemCoHub"), 401
-
-
-@app.route("/a")
-def a():
-    abort(401)
 
 
 if __name__ == "__main__":
