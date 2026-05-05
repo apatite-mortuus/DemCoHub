@@ -5,9 +5,8 @@ import pathlib
 import os
 import hashlib
 import shutil
-import tempfile
 
-from flask import Flask, render_template, redirect, request, url_for, abort, jsonify, send_from_directory, send_file
+from flask import Flask, render_template, redirect, request, url_for, abort, jsonify, send_file
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
 
 from data.users import User
@@ -24,6 +23,7 @@ from forms.register_form import RegisterForm
 from forms.post_audio_form import PostAudioForm
 from forms.repo_form import RepoForm
 from forms.branch_form import BranchForm
+from forms.add_to_repository_form import AddToRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = secrets.token_urlsafe(32)
@@ -113,6 +113,7 @@ def login():
         with db_session.create_session() as db_sess:
             user = db_sess.query(User).filter(
                 (User.email == form.login.data) | (User.nickname == form.login.data)).first()
+            print(user)
             if user and user.check_password(form.password.data):
                 login_user(user, remember=form.remember_me.data)
                 return redirect("/")
@@ -176,17 +177,24 @@ def audio_delete(id):
             db_sess.delete(audio)
             db_sess.commit()
         else:
-            abort(404)
+            return abort(404)
         return redirect('/')
 
 
 @app.route("/<nickname>")
 def profile(nickname):
     with db_session.create_session() as db_sess:
-        files = db_sess.query(User).filter(User.nickname == nickname).first().audiofile
-        if not current_user.is_authenticated or current_user.nickname != nickname:
-            return render_template("profile.html", files=files, title=f"{nickname} | DemCoHub", user=nickname)
-        return render_template("profile.html", files=files, title=f"{current_user.nickname} | DemCoHub")
+        user = db_sess.query(User).filter(User.nickname == nickname).first()
+        if user:
+            files = user.audiofile
+            buffer = user.buffer
+            print(buffer)
+            if not current_user.is_authenticated or current_user.nickname != nickname:
+                return render_template("profile.html", files=files, title=f"{nickname} | DemCoHub", user=nickname,
+                                       buffer=buffer)
+            return render_template("profile.html", files=files, title=f"{current_user.nickname} | DemCoHub", user=None,
+                                   buffer=buffer)
+        return abort(404)
 
 
 @app.route("/create_repository", methods=["GET", "POST"])
@@ -236,22 +244,62 @@ def repositories_list(nickname):
         return render_template("repositories_list.html", repos=repos, title=f"Ваши репозитории | DemCoHub")
 
 
+@app.route("/<nickname>/coauthorship")
+def coauthorship_repositories(nickname):
+    with db_session.create_session() as db_sess:
+        repos = db_sess.query(Repositories).join(Repositories.coauthors).filter(User.nickname == nickname).all()
+        if not current_user.is_authenticated or current_user.nickname != nickname:
+            return abort(403)
+        return render_template("coauthorship_repositories.html", repos=repos, title=f"Соавторство | DemCoHub")
+
+
+@app.route("/add_to_repository/<repository>", methods=["GET", "POST"])
+def add_to_repository(repository):
+    form = AddToRepository()
+    if form.validate_on_submit():
+        with db_session.create_session() as db_sess:
+            user = db_sess.query(User).filter(
+                (form.login.data == User.nickname) | (form.login.data == User.email)).first()
+            repository = db_sess.query(Repositories).join(Repositories.user).filter(repository == Repositories.title,
+                                                                                    User.id == current_user.id).first()
+            print(user.coauthorship)
+            if repository in user.coauthorship:
+                return render_template("add_to_repository_form.html",
+                                       title="Добавление пользователя в репозиторий | DemCoHub",
+                                       form=form, message="Пользователь уже добавлен в репозиторий",
+                                       repository=repository)
+            user.coauthorship.append(repository)
+            db_sess.commit()
+            return redirect("/")
+    return render_template("add_to_repository_form.html", title="Добавление пользователя в репозиторий | DemCoHub",
+                           form=form, repository=repository)
+
+
 @app.route("/<nickname>/repositories/<repository>")
 def show_repository(nickname, repository):
     with db_session.create_session() as db_sess:
-        branches = db_sess.query(Branches).join(Branches.repository).filter(Repositories.title == repository).all()
-        if not current_user.is_authenticated or current_user.nickname != nickname:
+        repo = db_sess.query(Repositories).join(Repositories.user).filter(Repositories.title == repository,
+                                                                          User.nickname == nickname).first()
+        branches = repo.branches
+        coauthors = repo.coauthors
+        if current_user.nickname != nickname and current_user not in coauthors:
             return abort(403)
-        return render_template("repository.html", branches=branches, title=f"{repository} | DemCoHub")
+        return render_template("repository.html", nickname=nickname, branches=branches,
+                               title=f"{repository} | DemCoHub")
 
 
 @app.route("/<nickname>/repositories/<repository>/<branch>")
 def show_branch(nickname, repository, branch):
     with db_session.create_session() as db_sess:
-        br = db_sess.query(Branches).join(Repositories).filter(Branches.title == branch,
-                                                               Repositories.title == repository).first()
+        repo = db_sess.query(Repositories).join(Repositories.user).filter(Repositories.title == repository,
+                                                                          User.nickname == nickname).first()
+        coauthors = repo.coauthors
+        br = [b for b in repo.branches if b.title == branch][0]
+        print(br)
+        print(coauthors)
         commits = br.commits
-        if not current_user.is_authenticated or current_user.nickname != nickname:
+        print(commits)
+        if current_user.nickname != nickname and current_user not in coauthors:
             return abort(403)
         return render_template("branch.html", nickname=nickname, repository=repository, branch=branch, commits=commits,
                                title=f"{repository} | DemCoHub")
@@ -270,7 +318,7 @@ def create_branch(repository):
                     Branches.title == form.title.data,
                     User.id == current_user.id).first():
                 return render_template("branch_form.html", title="Создание ветки | DemCoHub",
-                                       form=form, message="Ветка с таким именем уже существует")
+                                       form=form, message="Ветка с таким именем уже существует", repository=repository)
             branch = Branches(
                 title=form.title.data,
                 repository_id=db_sess.query(Repositories.id).filter(Repositories.id == repository).first(),
@@ -279,88 +327,113 @@ def create_branch(repository):
             db_sess.add(branch)
             db_sess.commit()
             return redirect(f"/{current_user.nickname}/repositories/{repository}")
-        return render_template("branch_form.html", title="Создание ветки | DemCoHub", form=form)
+        return render_template("branch_form.html", title="Создание ветки | DemCoHub", form=form, repository=repository)
 
 
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/<path:folders>")
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>", defaults={"folders": None})
+@login_required
 def show_commit(nickname, repository, branch, sha1, folders):
-    # if not current_user.is_authenticated or current_user.nickname != nickname:
-    #     return abort(403)
     with db_session.create_session() as db_sess:
         folders = folders.split("/") if folders else []
+        repo = db_sess.query(Repositories).join(Repositories.user).filter(Repositories.title == repository,
+                                                                          User.nickname == nickname).first()
+        coauthors = repo.coauthors
         commit = db_sess.query(Commits).filter(Commits.sha1 == sha1).first()
         dr = [(i, os.path.isfile(commit.path + "/" + "/".join(folders + [i]))) for i in
               os.listdir(commit.path + "/" + "/".join(folders))]
+        if current_user.nickname != nickname and current_user not in coauthors:
+            return abort(403)
         return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
-                               commit=commit.sha1, dr=dr, folders=folders,
+                               commit=commit.sha1, dr=dr, folders=folders, buffer=False,
                                title=f"{commit.sha1[:7]} | DemCoHub")
 
 
 @app.route("/buffer/<path:folders>")
 @app.route("/buffer", defaults={"folders": None})
+@login_required
 def show_buffer(folders):
+    folders = folders.split("/") if folders else []
     with db_session.create_session() as db_sess:
         buffer = db_sess.query(Buffers).join(Buffers.user).filter(User.id == current_user.id).first()
-        nickname = buffer.user.nickname
-        branch = buffer.branch.title
-        repository = buffer.branch.repository.title
-        folders = folders.split("/") if folders else []
-        path = f"static/upload/users/{nickname}/buffer/"
-        dr = [(i, os.path.isfile(path + "/" + "/".join(folders + [i]))) for i in
-              os.listdir(path + "/".join(folders))]
-        return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
-                               commit="buffer", dr=dr, folders=folders,
-                               title="buffer | DemCoHub")
+        if buffer:
+            nickname = buffer.user.nickname
+            branch = buffer.branch.title
+            repository = buffer.branch.repository.title
+            path = f"static/upload/users/{nickname}/buffer/"
+            dr = [(i, os.path.isfile(path + "/" + "/".join(folders + [i]))) for i in
+                  os.listdir(path + "/".join(folders))]
+            return render_template("commit.html", nickname=nickname, repository=repository, branch=branch,
+                                   commit="buffer", dr=dr, folders=folders, buffer=True,
+                                   title="buffer | DemCoHub")
+        return abort(400)
 
 
 @app.route("/<path:folders>/post_file", methods=["POST"])
 @app.route("/post_file", defaults={"folders": None}, methods=["POST"])
+@login_required
 def post_file(folders):
     folders = folders.split("/") if folders else []
-    path = f"static/upload/users/{current_user.nickname}/buffer/"
-    request.files["file"].save(path + "/".join(folders + [request.form["name"]]))
-    return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    path = f"static/upload/users/{current_user.nickname}/buffer/" + "/".join(folders + [""])
+    pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+    request.files["file"].save(path + request.form["name"])
+    if folders:
+        return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    return redirect(url_for("show_buffer"))
 
 
 @app.route("/<path:folders>/delete_file", methods=["DELETE"])
 @app.route("/delete_file", defaults={"folders": None}, methods=["DELETE"])
+@login_required
 def delete_file(folders):
     folders = folders.split("/") if folders else []
     path = f"static/upload/users/{current_user.nickname}/buffer/"
     os.remove(path + "/".join(folders + [request.form["name"]]))
-    return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    if folders:
+        return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    return redirect(url_for("show_buffer"))
 
 
 @app.route("/<path:folders>/delete_folder", methods=["DELETE"])
 @app.route("/delete_folder", defaults={"folders": None}, methods=["DELETE"])
+@login_required
 def delete_folder(folders):
     folders = folders.split("/") if folders else []
     path = f"static/upload/users/{current_user.nickname}/buffer/"
-    shutil.rmtree(path + "/".join(folders + [request.form["name"]]))
-    return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    try:
+        shutil.rmtree(path + "/".join(folders + [request.form["name"]]))
+    except FileNotFoundError:
+        pass
+    if folders:
+        return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    return redirect(url_for("show_buffer"))
 
 
 @app.route("/<path:folders>/create_folder", methods=["POST"])
 @app.route("/create_folder", defaults={"folders": None}, methods=["POST"])
+@login_required
 def create_folder(folders):
     folders = folders.split("/") if folders else []
     path = f"static/upload/users/{current_user.nickname}/buffer/"
     pathlib.Path(path + "/".join(folders + [request.form["folderName"]])).mkdir(parents=True, exist_ok=True)
-    return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    if folders:
+        return redirect(url_for("show_buffer", folders='/'.join(folders)))
+    return redirect(url_for("show_buffer"))
 
 
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/create_buffer", methods=["POST"])
+@login_required
 def create_buffer(nickname, repository, branch, sha1):
-    path = f"static/upload/users/{nickname}/buffer/"
+    path = f"static/upload/users/{current_user.nickname}/buffer/"
     if not os.path.exists(path):
         with db_session.create_session() as db_sess:
             pathlib.Path(path).mkdir(exist_ok=True, parents=True)
             commit = db_sess.query(Commits).filter(Commits.sha1 == sha1).first()
             shutil.copytree(commit.path, path, dirs_exist_ok=True)
             buffer = Buffers(
-                user_id=db_sess.query(User).filter(User.nickname == nickname).first().id,
-                branch_id=db_sess.query(Branches).filter(Branches.title == branch).first().id
+                user_id=db_sess.query(User).filter(User.nickname == current_user.nickname).first().id,
+                branch_id=db_sess.query(Branches).join(Branches.repository).join(Repositories.user).filter(
+                    Branches.title == branch, User.nickname == nickname).first().id
             )
             db_sess.add(buffer)
             db_sess.commit()
@@ -368,14 +441,13 @@ def create_buffer(nickname, repository, branch, sha1):
 
 
 @app.route("/create_commit", methods=["POST"])
+@login_required
 def create_commit():
-    # if not current_user.is_authenticated or current_user.nickname != nickname:
-    #     return abort(403)
     with db_session.create_session() as db_sess:
         buffer = db_sess.query(Buffers).join(Buffers.user).filter(User.id == current_user.id).first()
-        nickname = buffer.user.nickname
+        nickname = buffer.branch.repository.user.nickname
         repository = buffer.branch.repository.title
-        path = f"static/upload/users/{nickname}/buffer"
+        path = f"static/upload/users/{current_user.nickname}/buffer"
         commit = Commits(
             description=request.form["message"],
             path=f"static/upload/users/{nickname}/repositories/{repository}/commits/",
@@ -393,6 +465,7 @@ def create_commit():
 
 
 @app.route("/delete_buffer", methods=["DELETE"])
+@login_required
 def delete_buffer():
     with db_session.create_session() as db_sess:
         buffer = db_sess.query(Buffers).join(Buffers.user).filter(User.id == current_user.id).first()
@@ -406,24 +479,26 @@ def delete_buffer():
 
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/<path:folders>/download_file/<filename>")
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/download_file/<filename>", defaults={"folders": None})
+@login_required
 def download_file(nickname, repository, branch, sha1, folders, filename):
     if sha1 == "buffer":
         return send_file(
             f"static/upload/users/{nickname}/buffer{("/" + folders) if folders else ''}/{filename}",
             as_attachment=True)
     return send_file(
-        f"static/upload/users/{nickname}/repositories/{repository}/{sha1[:7]}{("/" + folders) if folders else ''}/{filename}",
+        f"static/upload/users/{nickname}/repositories/{repository}/commits/{sha1[:7]}{("/" + folders) if folders else ''}/{filename}",
         as_attachment=True)
 
 
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/<path:folders>/download_folder/<filename>")
 @app.route("/<nickname>/repositories/<repository>/<branch>/<sha1>/download_folder/<filename>",
            defaults={"folders": None})
+@login_required
 def download_folder(nickname, repository, branch, sha1, folders, filename):
     if sha1 == "buffer":
         path = f"static/upload/users/{nickname}/buffer{("/" + folders) if folders else ''}/{filename}"
     else:
-        path = f"static/upload/users/{nickname}/repositories/{repository}/{sha1[:7]}{("/" + folders) if folders else ''}/{filename}"
+        path = f"static/upload/users/{nickname}/repositories/{repository}/commits/{sha1[:7]}{("/" + folders) if folders else ''}/{filename}"
     try:
         shutil.make_archive(filename, 'zip', path)
         zip_buffer = io.BytesIO()
@@ -433,6 +508,32 @@ def download_folder(nickname, repository, branch, sha1, folders, filename):
         return send_file(zip_buffer, as_attachment=True, download_name=(filename + ".zip"))
     finally:
         os.remove(filename + ".zip")
+
+
+@app.errorhandler(404)
+def page_not_found(error):
+    return render_template('errors/404.html', title="404 | DemCoHub"), 404
+
+@app.errorhandler(403)
+def forbidden(error):
+    return render_template('errors/403.html', title="403 | DemCoHub"), 403
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return render_template('errors/500.html', title="500 | DemCoHub"), 500
+
+@app.errorhandler(400)
+def bad_request(error):
+    return render_template('errors/400.html', title="400 | DemCoHub"), 400
+
+@app.errorhandler(401)
+def unauthorized(error):
+    return render_template('errors/401.html', title="401 | DemCoHub"), 401
+
+
+@app.route("/a")
+def a():
+    abort(401)
 
 
 if __name__ == "__main__":

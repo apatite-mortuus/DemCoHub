@@ -1,54 +1,209 @@
 {% extends 'base.html' %}
 
 {% block content %}
-
-{% if current_user.is_authenticated %}
-    <p>{{ current_user.nickname }}</p>
-    <p>{{ current_user.email }}</p>
-    <a href="{{ url_for('repositories_list', nickname=current_user.nickname) }}">Репозитории</a>
-    <a href="{{ url_for('show_buffer') }}">Буфер</a>
-{% else %}
-    <p>{{ user }}</p>
-    <a href="{{ url_for('repositories_list', nickname=user) }}">Репозитории</a>
-{% endif %}
-<h1>Опубликованные аудиозаписи</h1>
-<table class="table">
-    <thead>
-    <tr class="table-secondary">
-        <th>Название</th>
-        <th>Аудиофайл</th>
-        <th>Автор</th>
-        <th>Дата публикации</th>
-        <th>Оценки:</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for file in files %}
-    <tr class="table-secondary">
-        <td>{{ file.title }}</td>
-        <td>
-            <audio src="{{ file.path_to_file }}" controls></audio>
-        </td>
-        <td>{{ file.author }}</td>
-        <td>{{ file.date_time }}</td>
-        <td>
-            <button class="like" data-id="{{ file.id }}"
-                    {% if not current_user.is_authenticated %} disabled {% endif %}>like {{ file.likes|length }}
-            </button>
-            <button class="dislike" data-id="{{ file.id }}"
-                    {% if not current_user.is_authenticated %} disabled {% endif %}>dislike {{ file.dislikes|length }}
-            </button>
-            {% if current_user.is_authenticated and current_user.id == file.posted %}
-            <div>
-                <a href="{{ url_for('audio_delete', id=file.id) }}" class="btn btn-danger">
-                    Удалить
-                </a>
+<div class="container py-4">
+    <!-- Карточка профиля -->
+    <div class="card shadow-sm mb-4 profile-card">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-8" style="width: 50%;">
+                    {% if not user %}
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-lg me-3">
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white avatar-initials">
+                                    {{ current_user.nickname[0]|upper }}
+                                </div>
+                            </div>
+                            <div>
+                                <h2 class="mb-1">{{ current_user.nickname }}</h2>
+                                <p class="text-muted mb-0">{{ current_user.email }}</p>
+                            </div>
+                        </div>
+                    {% else %}
+                        <h2 class="mb-2">{{ user }}</h2>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 text-md-end" style="width: 50%;">
+                    <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                        {% if not user %}
+                            <a href="{{ url_for('post_audio') }}" class="btn btn-primary" style="width: 400px;">
+                                <i class="bi bi-mic"></i> Опубликовать аудиозапись
+                            </a>
+                            <a href="{{ url_for('repositories_list', nickname=current_user.nickname) }}"
+                               class="btn btn-primary me-2">
+                                <i class="bi bi-folder2-open"></i> Репозитории
+                            </a>
+                            <a href="{{ url_for('coauthorship_repositories', nickname=current_user.nickname) }}"
+                               class="btn btn-primary me-2">
+                                <i class="bi bi-folder2-open"></i> Соавторство
+                            </a>
+                            <a {% if buffer %} href="{{ url_for('show_buffer') }}" {% endif %}
+                               class="btn btn-outline-secondary">
+                                <i class="bi bi-clipboard"></i> Буфер
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
-            {% endif %}
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
+        </div>
+    </div>
+
+    <!-- Заголовок аудиозаписей -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">
+            <i class="bi bi-music-note-beamed"></i> Опубликованные аудиозаписи
+        </h3>
+        <span class="badge bg-secondary fs-6">{{ files|length }} записей</span>
+    </div>
+
+    {% if files %}
+        <!-- Сетка аудиозаписей -->
+        <div class="row">
+            {% for file in files %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 shadow-sm audio-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h5 class="card-title mb-0 text-truncate" style="max-width: 70%;"
+                                title="{{ file.title }}">
+                                {{ file.title }}
+                            </h5>
+                            {% if current_user.is_authenticated and current_user.id == file.posted %}
+                                <a href="{{ url_for('audio_delete', id=file.id) }}"
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Вы уверены, что хотите удалить эту запись?')">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <audio src="{{ file.path_to_file }}" controls preload="metadata"></audio>
+                        </div>
+
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ file.author }}
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted">
+                                <i class="bi bi-calendar"></i> {{ file.date_time[:-7] }}
+                            </small>
+                        </div>
+
+                        <div class="d-flex gap-2 align-items-center">
+                            <button class="btn btn-sm btn-outline-success like"
+                                    data-id="{{ file.id }}"
+                                    {% if not current_user.is_authenticated %} disabled {% endif %}>
+                                <i class="bi bi-hand-thumbs-up"></i>
+                                <span class="like-count">{{ file.likes|length }}</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger dislike"
+                                    data-id="{{ file.id }}"
+                                    {% if not current_user.is_authenticated %} disabled {% endif %}>
+                                <i class="bi bi-hand-thumbs-down"></i>
+                                <span class="dislike-count">{{ file.dislikes|length }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Пустое состояние -->
+        <div class="empty-state">
+            <i class="bi bi-music-note"></i>
+            <h4>Нет опубликованных аудиозаписей</h4>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // Функция обновления счетчика
+    function updateCounter(btn, delta) {
+        const span = btn.querySelector('span');
+        if (span) {
+            const currentCount = parseInt(span.textContent);
+            if (!isNaN(currentCount)) {
+                span.textContent = currentCount + delta;
+            }
+        }
+    }
+
+    // Функция для AJAX запросов
+    function sendVote(endpoint, btn, deltaSuccess, deltaError) {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("id", btn.dataset.id);
+
+        btn.disabled = true;
+        xhr.open("POST", endpoint);
+        xhr.send(formData);
+
+        xhr.onload = () => {
+            try {
+                const response = JSON.parse(xhr.response);
+                if (response.response === "created") {
+                    updateCounter(btn, deltaSuccess);
+                } else if (response.response === "deleted") {
+                    updateCounter(btn, deltaError);
+                } else if (response.error) {
+                    console.error(response.error);
+                    showTemporaryMessage('Ошибка: ' + response.error, 'danger');
+                }
+            } catch (e) {
+                console.error('Ошибка парсинга ответа:', e);
+                showTemporaryMessage('Произошла ошибка. Попробуйте позже.', 'danger');
+            }
+            btn.disabled = false;
+        };
+
+        xhr.onerror = () => {
+            btn.disabled = false;
+            showTemporaryMessage('Ошибка соединения. Проверьте интернет.', 'danger');
+        };
+    }
+
+    // Функция для временных сообщений
+    function showTemporaryMessage(message, type = 'info') {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.style.maxWidth = '300px';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    }
+
+    // Обработчики лайков
+    const likeBtns = document.querySelectorAll(".like");
+    likeBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            sendVote("/like", btn, 1, -1);
+        });
+    });
+
+    // Обработчики дизлайков
+    const dislikeBtns = document.querySelectorAll(".dislike");
+    dislikeBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            sendVote("/dislike", btn, 1, -1);
+        });
+    });
+
+</script>
 
 {% endblock %}

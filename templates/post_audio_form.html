@@ -1,12 +1,16 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<p>
+    <a class="btn-action btn-back" href="{{ url_for('index') }}"><i
+            class="bi bi-arrow-left"></i>Назад</a>
+</p>
 <h1>Публикация аудиофайла</h1>
 <form action="" method="post" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
     <p>
         {{ form.file.label }}<br>
-        {{ form.file(class="form-form-control-file", type="file") }}<br>
+        {{ form.file(class="form-control", type="file") }}<br>
         {% for error in form.file.errors %}
     <div class="alert alert-danger" role="alert">
         {{ error }}

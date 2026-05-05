@@ -3,19 +3,36 @@
 {% block content %}
 
 <p>
-    <a class="btn btn-primary" href="{{ url_for('create_branch', repository=branches[0].repository.title) }}">Создать новую ветку</a>
+    <a class="btn-action btn-back" href="
+    {% if nickname == current_user.nickname %}
+        {{ url_for('repositories_list', nickname=nickname) }}
+    {% else %}
+        {{ url_for('coauthorship_repositories', nickname=current_user.nickname) }}
+    {% endif %}"><i
+            class="bi bi-arrow-left"></i>Назад</a>
+</p>
+<p>
+    <a class="btn btn-primary" href="{{ url_for('create_branch', repository=branches[0].repository.title) }}">Создать
+        новую ветку</a>
+</p>
+<p>
+    <a class="btn btn-primary" href="{{ url_for('add_to_repository', repository=branches[0].repository.title) }}">Добавить
+        пользователя в
+        репозиторий</a>
 </p>
 
 <h1>Ветки в репозитории {{ branches[0].repository.title }}</h1>
-<table class="table">
-    <tbody>
-    {% for branch in branches %}
-    <tr class="table-secondary">
-        <td>
-            <a href="/{{ branch.repository.user.nickname }}/repositories/{{ branch.repository.title }}/{{ branch.title }}">{{
-                branch.title }}</a></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
+<div class="table-responsive">
+    <table class="table">
+        <tbody>
+        {% for branch in branches %}
+        <tr class="table-secondary">
+            <td>
+                <a href="/{{ branch.repository.user.nickname }}/repositories/{{ branch.repository.title }}/{{ branch.title }}">{{
+                    branch.title }}</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}

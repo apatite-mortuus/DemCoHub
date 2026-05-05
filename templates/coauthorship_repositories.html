@@ -2,16 +2,13 @@
 
 {% block content %}
 
-<p>
-    <a class="btn btn-primary" href="{{ url_for('create_repository') }}">Создать новый репозиторий</a>
-</p>
-
-<h1>Ваши репозитории:</h1>
+<h1>Соавторство в репозиториях:</h1>
 <div class="table-responsive">
     <table class="table">
         <thead>
         <tr class="table-secondary">
             <th>Название</th>
+            <th>Создатель</th>
             <th>Описание</th>
             <th>Соавторы</th>
         </tr>
@@ -21,6 +18,7 @@
         <tr class="table-secondary">
             <td><a href="{{ url_for('show_repository', nickname=repo.user.nickname, repository=repo.title) }}">{{
                 repo.title }}</a></td>
+            <td>{{ repo.user.nickname }}</td>
             <td>{{ repo.description }}</td>
             <td>{% for author in repo.coauthors %}
                 <ul>{{ author.nickname }}</ul>

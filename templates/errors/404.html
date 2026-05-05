@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="error-container text-center">
+        <div class="error-code animate__animated animate__fadeInUp">
+            <h1 class="display-1 fw-bold text-primary">404</h1>
+        </div>
+        
+        <div class="error-content animate__animated animate__fadeInUp animate__delay-1s">
+            <div class="error-icon mb-4">
+                <i class="bi bi-compass display-1 text-muted"></i>
+            </div>
+            
+            <h2 class="mb-3">Страница не найдена</h2>
+            
+            <p class="text-muted mb-4">
+                К сожалению, страница, которую вы ищете, не существует или была перемещена.
+                Проверьте правильность URL или вернитесь на главную страницу.
+            </p>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}

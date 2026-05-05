@@ -1,57 +1,161 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="container py-4">
+    <!-- Хлебные крошки -->
+    <div class="breadcrumb-container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="
+                        {% if buffer %}
+                            {{ url_for('show_buffer') }}
+                        {% else %}
+                            {{ url_for('show_commit', nickname=nickname, repository=repository, branch=branch, sha1=commit) }}
+                        {% endif %}
+                    ">
+                        <i class="bi bi-house-door"></i> Корень
+                    </a>
+                </li>
+                {% for folder in folders %}
+                <li class="breadcrumb-item">
+                    <a href="
+                        {% if buffer %}
+                            {{ url_for('show_buffer', folders=folders[:loop.index] | join('/')) }}
+                        {% else %}
+                            {{ url_for('show_commit', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=folders[:loop.index] | join('/')) }}
+                        {% endif %}
+                    ">
+                        {{ folder }}
+                    </a>
+                </li>
+                {% endfor %}
+                <li class="breadcrumb-item active" aria-current="page">
+                    {% if buffer %}Буфер{% else %}{{ commit[:7] }}{% endif %}
+                </li>
+            </ol>
+        </nav>
+    </div>
 
-<h1>{{ commit[:7] }}</h1>
-<table class="table">
-    <tbody>
-    {% for pos in dr %}
-    <tr class="table-secondary">
-        <td><a {% if not pos[1] %}href="
-                {% if commit != 'buffer' %}{{ url_for('show_commit', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=(folders + [pos[0]]) | join('/')) }}{%
-            else %}{{ url_for('show_buffer', folders=(folders + [pos[0]]) | join('/')) }}{% endif %}" {% endif %}>{{
-            pos[0] }}</a></td>
-        <td>
-            <button class="download-file-btn">
-            <a href="{% if pos[1] %}
-                    {{ url_for('download_file', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=folders | join('/'), filename=pos[0]) }}
+    <!-- Заголовок и кнопки -->
+    <div class="commit-header">
+        <h1>
+            <i class="bi {% if buffer %}bi-clipboard{% else %}bi-git-commit{% endif %}"></i>
+            {% if buffer %}
+                Буфер изменений
+            {% else %}
+                Коммит: {{ commit[:7] }}
+            {% endif %}
+        </h1>
+
+        <div class="action-buttons-bar">
+            <a class="btn-action btn-back" href="
+                {% if buffer %}
+                    {% if folders %}
+                        {{ url_for('show_buffer', folders=folders[:-1] | join('/') if folders[:-1] else None) }}
                     {% else %}
-                    {{ url_for('download_folder', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=folders | join('/'), filename=pos[0]) }}
-                    {% endif %}">
-                Скачать
+                        {{ url_for('profile', nickname=nickname) }}
+                    {% endif %}
+                {% else %}
+                    {% if folders %}
+                        {{ url_for('show_commit', nickname=nickname, branch=branch, sha1=commit, repository=repository, folders=folders[:-1] | join('/') if folders[:-1] else None) }}
+                    {% else %}
+                        {{ url_for('show_branch', nickname=nickname, branch=branch, repository=repository) }}
+                    {% endif %}
+                {% endif %}
+            ">
+                <i class="bi bi-arrow-left"></i> Назад
             </a>
-            </button>
-        </td>
-        <td>
-            <button class="delete-file-btn btn-danger" data-filename="{{ pos[0] }}"
-                    data-isfile="{% if not pos[1] %}0{% else %}1{% endif %}">
-                Удалить
-            </button>
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
 
-<button onclick="document.getElementById('fileInput').click();">Загрузить новый файл</button>
-<input type="file" id="fileInput" hidden onchange="handleFiles(this.files)" multiple>
-<button id="commitBtn">Совершить коммит</button>
-<button id="createFolderBtn">Создать папку</button>
+            {% if buffer %}
+                <button class="btn-action btn-delete-buffer" id="deleteBufferBtn">
+                    <i class="bi bi-trash"></i> Очистить буфер
+                </button>
+            {% endif %}
+        </div>
+    </div>
 
-<!-- Модальное окно для удаления -->
-<div id="deleteModal" class="modal" style="display: none;">
+    <!-- Кнопки управления -->
+    <div class="action-buttons-bar">
+        <button class="btn-action btn-upload" id="uploadBtn">
+            <i class="bi bi-cloud-upload"></i> Загрузить файл
+        </button>
+        <input type="file" id="fileInput" hidden multiple>
+
+        <button class="btn-action btn-commit" id="commitBtn">
+            <i class="bi bi-git-commit"></i> Совершить коммит
+        </button>
+
+        <button class="btn-action btn-folder" id="createFolderBtn">
+            <i class="bi bi-folder-plus"></i> Создать папку
+        </button>
+    </div>
+
+    <!-- Таблица файлов и папок -->
+    {% if dr %}
+        <div class="table-responsive files-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-files"></i> Название</th>
+                        <th><i class="bi bi-gear"></i> Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pos in dr %}
+                    <tr>
+                        <td data-label="Название">
+                            <a {% if not pos[1] %}href="
+                {% if not buffer %}{{ url_for('show_commit', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=(folders + [pos[0]]) | join('/')) }}{%
+            else %}{{ url_for('show_buffer', folders=(folders + [pos[0]]) | join('/')) }}{% endif %}" {% endif %}>
+                                <i class="bi {% if pos[1] %}bi-file-music file-icon{% else %}bi-folder-fill folder-icon{% endif %}"></i>
+                                {{ pos[0] }}
+                            </a>
+                        </td>
+                        <td data-label="Действия">
+                            <div class="table-action-buttons">
+                                <button class="btn-table-action btn-download download-btn"
+                                        data-filename="{{ pos[0] }}"
+                                        data-isfile="{% if pos[1] %}1{% else %}0{% endif %}">
+                                    <i class="bi bi-download"></i> Скачать
+                                </button>
+
+                                <button class="btn-table-action btn-delete-file delete-file-btn"
+                                        data-filename="{{ pos[0] }}"
+                                        data-isfile="{% if pos[1] %}1{% else %}0{% endif %}">
+                                    <i class="bi bi-trash"></i> Удалить
+                                </button>
+                            </div>
+                         </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <!-- Пустое состояние -->
+        <div class="empty-state">
+            <i class="bi bi-folder2-open"></i>
+            <h4>Папка пуста</h4>
+            <p>Загрузите файлы или создайте папку, чтобы продолжить</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Модальное окно для удаления файла/папки -->
+<div id="deleteFileModal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Подтверждение удаления</h3>
-            <span class="close-delete-btn">&times;</span>
+            <h3><i class="bi bi-exclamation-triangle"></i> Подтверждение удаления</h3>
+            <span class="close-modal close-delete-modal">&times;</span>
         </div>
         <div class="modal-body">
-            <p>Вы уверены, что хотите удалить файл <strong id="fileNameToDelete"></strong>?</p>
-            <p class="warning-text">Это действие необратимо.</p>
+            <p>Вы уверены, что хотите удалить <strong id="fileNameToDelete"></strong>?</p>
+            <p class="warning-text"><i class="bi bi-exclamation-circle"></i> Это действие необратимо.</p>
         </div>
         <div class="modal-footer">
-            <button id="cancelDeleteBtn" class="btn-secondary">Отмена</button>
-            <button id="confirmDeleteBtn" class="btn-danger">Удалить</button>
+            <button class="btn-secondary cancel-delete-btn">Отмена</button>
+            <button class="btn-danger confirm-delete-btn">Удалить</button>
         </div>
     </div>
 </div>
@@ -60,23 +164,21 @@
 <div id="commitModal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Совершить коммит</h3>
-            <span class="close-commit-btn">&times;</span>
+            <h3><i class="bi bi-git-commit"></i> Совершить коммит</h3>
+            <span class="close-modal close-commit-modal">&times;</span>
         </div>
         <div class="modal-body">
-            <form id="commitForm">
-                <div class="form-group">
-                    <label for="commitMessage">Описание коммита:</label>
-                    <textarea id="commitMessage" name="message" rows="4"
-                              placeholder="Введите описание изменений..."
-                              required></textarea>
-                    <small class="form-text">Опишите, какие изменения были внесены</small>
-                </div>
-            </form>
+            <div class="form-group">
+                <label for="commitMessage">Описание коммита:</label>
+                <textarea id="commitMessage" rows="4"
+                          placeholder="Введите описание изменений..."
+                          required></textarea>
+                <small class="form-text">Опишите, какие изменения были внесены</small>
+            </div>
         </div>
         <div class="modal-footer">
-            <button id="cancelCommitBtn" class="btn-secondary">Отмена</button>
-            <button id="confirmCommitBtn" class="btn-success">Отправить коммит</button>
+            <button class="btn-secondary cancel-commit-btn">Отмена</button>
+            <button class="btn-success confirm-commit-btn">Отправить коммит</button>
         </div>
     </div>
 </div>
@@ -85,330 +187,378 @@
 <div id="folderModal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Создать новую папку</h3>
-            <span class="close-folder-btn">&times;</span>
+            <h3><i class="bi bi-folder-plus"></i> Создать новую папку</h3>
+            <span class="close-modal close-folder-modal">&times;</span>
         </div>
         <div class="modal-body">
-            <form id="folderForm">
-                <div class="form-group">
-                    <label for="folderName">Название папки:</label>
-                    <input type="text" id="folderName" name="folderName"
-                           placeholder="Введите название папки"
-                           required autocomplete="off">
-                    <small class="form-text">Используйте только буквы, цифры, дефисы и подчеркивания</small>
-                </div>
-            </form>
+            <div class="form-group">
+                <label for="folderName">Название папки:</label>
+                <input type="text" id="folderName"
+                       placeholder="Введите название папки"
+                       required autocomplete="off">
+                <small class="form-text">Используйте только буквы, цифры, дефисы и подчеркивания</small>
+            </div>
         </div>
         <div class="modal-footer">
-            <button id="cancelFolderBtn" class="btn-secondary">Отмена</button>
-            <button id="confirmFolderBtn" class="btn-success">Создать</button>
+            <button class="btn-secondary cancel-folder-btn">Отмена</button>
+            <button class="btn-success confirm-folder-btn">Создать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для подтверждения очистки буфера -->
+<div id="clearBufferModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="bi bi-exclamation-triangle"></i> Очистка буфера</h3>
+            <span class="close-modal close-buffer-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Вы уверены, что хотите очистить буфер?</p>
+            <p class="warning-text"><i class="bi bi-exclamation-circle"></i> Все файлы в буфере будут удалены безвозвратно.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary cancel-buffer-btn">Отмена</button>
+            <button class="btn-danger confirm-buffer-btn">Очистить буфер</button>
         </div>
     </div>
 </div>
 
 <script>
+    // Переменные для хранения состояния
     let currentFileName = null;
-    let isDeleting = false;
-    let isCommitting = false;
-    let isCreatingFolder = false;
+    let currentIsFile = null;
 
-    const deleteModal = document.getElementById('deleteModal');
+
+    // ========== УДАЛЕНИЕ ФАЙЛА/ПАПКИ ==========
+    const deleteFileModal = document.getElementById('deleteFileModal');
     const fileNameSpan = document.getElementById('fileNameToDelete');
-    const closeDeleteBtn = document.querySelector('.close-delete-btn');
-    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    let confirmDeleteCallback = null;
 
-    // Функция для закрытия модального окна удаления
-    function closeDeleteModal() {
-        deleteModal.style.display = 'none';
-        currentFileName = null;
+    function openDeleteModal(filename, isFile, callback) {
+        currentFileName = filename;
+        currentIsFile = isFile;
+        fileNameSpan.textContent = currentFileName;
+        confirmDeleteCallback = callback;
+        deleteFileModal.style.display = 'block';
     }
 
-    // Открыть модальное окно при клике на "Удалить"
+    function closeDeleteModal() {
+        deleteFileModal.style.display = 'none';
+        currentFileName = null;
+        confirmDeleteCallback = null;
+    }
+
     document.querySelectorAll('.delete-file-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            e.stopPropagation();
+            const filename = this.dataset.filename;
+            const isFile = this.dataset.isfile === '1';
 
-            // Сбрасываем состояние кнопки подтверждения
-            if (confirmDeleteBtn) {
-                confirmDeleteBtn.disabled = false;
-                confirmDeleteBtn.textContent = 'Удалить';
-            }
-
-            currentFileName = this.getAttribute('data-filename');
-            currentIsFile = this.getAttribute('data-isfile');
-            fileNameSpan.textContent = currentFileName;
-            deleteModal.style.display = 'block';
-        });
-    });
-
-    // Закрыть модальное окно удаления
-    if (closeDeleteBtn) closeDeleteBtn.onclick = closeDeleteModal;
-    if (cancelDeleteBtn) cancelDeleteBtn.onclick = closeDeleteModal;
-
-    // Подтверждение удаления
-    if (confirmDeleteBtn) {
-        confirmDeleteBtn.onclick = function() {
-            if (currentFileName) {
-                isDeleting = true;
-                confirmDeleteBtn.disabled = true;
-                confirmDeleteBtn.textContent = 'Удаление...';
-
+            openDeleteModal(filename, isFile, () => {
                 let xhr = new XMLHttpRequest();
-                {% if commit != "buffer" %}
-                    xhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", true);
-                    xhr.send();
-                    xhr = new XMLHttpRequest();
-                {% endif %}
-
-                xhr = new XMLHttpRequest();
                 let formData = new FormData();
-                formData.append("name", currentFileName);
-                url = "{% if folders %}/{{ folders | join("/") }}{% endif %}{% if currentIsFile %}/delete_file{% else %}/delete_folder{% endif %}";
+                formData.append("name", filename);
 
-                xhr.open("DELETE", url, true);
-                xhr.send(formData);
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === 4) {
-                        window.location.reload();
-                        isDeleting = false;
-                        if (confirmDeleteBtn) {
-                            confirmDeleteBtn.disabled = false;
-                            confirmDeleteBtn.textContent = 'Удалить';
-                        }
-                    }
-                };
-                closeDeleteModal();
-            }
-        };
-    }
-
-    // ========== МОДАЛЬНОЕ ОКНО ДЛЯ КОММИТА ==========
-    const commitModal = document.getElementById('commitModal');
-    const commitBtn = document.getElementById('commitBtn');
-    const closeCommitBtn = document.querySelector('.close-commit-btn');
-    const cancelCommitBtn = document.getElementById('cancelCommitBtn');
-    const confirmCommitBtn = document.getElementById('confirmCommitBtn');
-    const commitMessage = document.getElementById('commitMessage');
-
-    // Открыть модальное окно коммита
-    if (commitBtn) {
-        commitBtn.onclick = function(e) {
-            e.preventDefault();
-            if (commitMessage) commitMessage.value = '';
-            if (confirmCommitBtn) {
-                confirmCommitBtn.disabled = false;
-                confirmCommitBtn.textContent = 'Отправить коммит';
-            }
-            commitModal.style.display = 'block';
-            if (commitMessage) commitMessage.focus();
-        };
-    }
-
-    // Закрыть модальное окно коммита
-    function closeCommitModal() {
-        commitModal.style.display = 'none';
-        isCommitting = false;
-    }
-
-    if (closeCommitBtn) closeCommitBtn.onclick = closeCommitModal;
-    if (cancelCommitBtn) cancelCommitBtn.onclick = closeCommitModal;
-
-    // Отправка коммита
-    if (confirmCommitBtn) {
-        confirmCommitBtn.onclick = function() {
-            if (isCommitting) return;
-
-            const message = commitMessage ? commitMessage.value.trim() : '';
-
-            if (!message) {
-                alert('Пожалуйста, введите описание коммита');
-                commitMessage.focus();
-                return;
-            }
-
-            isCommitting = true;
-            closeCommitModal();
-
-            let formData = new FormData();
-            formData.append("message", message);
-
-            let xhr = new XMLHttpRequest();
-            xhr.open("POST", "/create_commit", true);
-            xhr.send(formData);
-        };
-    }
-
-    // ========== МОДАЛЬНОЕ ОКНО ДЛЯ СОЗДАНИЯ ПАПКИ ==========
-    const folderModal = document.getElementById('folderModal');
-    const createFolderBtn = document.getElementById('createFolderBtn');
-    const closeFolderBtn = document.querySelector('.close-folder-btn');
-    const cancelFolderBtn = document.getElementById('cancelFolderBtn');
-    const confirmFolderBtn = document.getElementById('confirmFolderBtn');
-    const folderNameInput = document.getElementById('folderName');
-
-    // Функция для валидации имени папки
-    function isValidFolderName(name) {
-        if (!name || name.trim() === '') return false;
-        // Разрешаем буквы, цифры, дефисы, подчеркивания и точки
-        const validPattern = /^[a-zA-Zа-яА-Я0-9_\-\.]+$/;
-        return validPattern.test(name);
-    }
-
-    // Открыть модальное окно создания папки
-    if (createFolderBtn) {
-        createFolderBtn.onclick = function(e) {
-            e.preventDefault();
-            if (folderNameInput) folderNameInput.value = '';
-            if (confirmFolderBtn) {
-                confirmFolderBtn.disabled = false;
-                confirmFolderBtn.textContent = 'Создать';
-            }
-            folderModal.style.display = 'block';
-            if (folderNameInput) folderNameInput.focus();
-        };
-    }
-
-    // Закрыть модальное окно создания папки
-    function closeFolderModal() {
-        folderModal.style.display = 'none';
-        isCreatingFolder = false;
-        if (folderNameInput) {
-            folderNameInput.classList.remove('error');
-        }
-    }
-
-    if (closeFolderBtn) closeFolderBtn.onclick = closeFolderModal;
-    if (cancelFolderBtn) cancelFolderBtn.onclick = closeFolderModal;
-
-    // Создание папки
-    if (confirmFolderBtn) {
-        confirmFolderBtn.onclick = function() {
-            if (isCreatingFolder) return;
-
-            const folderName = folderNameInput ? folderNameInput.value.trim() : '';
-
-            if (!folderName) {
-                alert('Пожалуйста, введите название папки');
-                if (folderNameInput) folderNameInput.focus();
-                return;
-            }
-
-            if (!isValidFolderName(folderName)) {
-                alert('Название папки может содержать только буквы, цифры, дефисы, подчеркивания и точки');
-                if (folderNameInput) {
-                    folderNameInput.classList.add('error');
-                    folderNameInput.focus();
-                }
-                return;
-            }
-
-            // Проверка на существующие имена (можно опционально)
-            const existingNames = [
-                {% for pos in dr %}
-                    "{{ pos[0] }}",
-                {% endfor %}
-            ];
-
-            if (existingNames.includes(folderName)) {
-                alert('Папка или файл с таким именем уже существует');
-                if (folderNameInput) {
-                    folderNameInput.classList.add('error');
-                    folderNameInput.focus();
-                }
-                return;
-            }
-
-            isCreatingFolder = true;
-            closeFolderModal();
-
-
-            // Для buffer режима сначала создаем buffer если нужно
-            {% if commit != "buffer" %}
+                {% if not buffer %}
+                // Создаем буфер если нужно
                 let initXhr = new XMLHttpRequest();
                 initXhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", false);
                 initXhr.send();
-            {% endif %}
+                {% endif %}
 
-            // Отправляем запрос на создание папки
-            let xhr = new XMLHttpRequest();
-            let formData = new FormData();
-            formData.append("folderName", folderName);
+                let url = "{% if folders %}/{{ folders | join("/") }}{% endif %}" + (currentIsFile ? "/delete_file" : "/delete_folder");
+                console.log(url);
+                xhr.open("DELETE", url, true);
+                xhr.send(formData);
+                xhr.onload = () => {
+                    setTimeout(() => window.location.reload(), 500);
+                };
+            });
+        });
+    });
 
-            // Формируем URL для запроса
-            let url = "";
-            {% if folders %}
-                url = "/{{ folders | join("/") }}/create_folder";
-            {% else %}
-                url = "/create_folder";
-            {% endif %}
+    // ========== ОЧИСТКА БУФЕРА ==========
+    const clearBufferModal = document.getElementById('clearBufferModal');
 
-            xhr.open("POST", url, true);
-            xhr.send(formData);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState == 4) {
-                    {% if commit != "buffer" %}
-                        window.location.href = "/buffer";
-                    {% endif %}
-                    window.location.reload();
-                }
-            };
-        };
+    function openClearBufferModal() {
+        clearBufferModal.style.display = 'block';
     }
 
-    // Закрытие модальных окон при клике вне их области
-    window.onclick = function(event) {
-        if (event.target === deleteModal) {
-            closeDeleteModal();
-        }
-        if (event.target === commitModal) {
-            closeCommitModal();
-        }
-        if (event.target === folderModal) {
-            closeFolderModal();
-        }
-    };
+    function closeClearBufferModal() {
+        clearBufferModal.style.display = 'none';
+    }
 
-    // Обработка загрузки файлов
+    document.getElementById('deleteBufferBtn')?.addEventListener('click', () => {
+        openClearBufferModal();
+    });
+
+    // ========== ЗАГРУЗКА ФАЙЛОВ ==========
     function handleFiles(files) {
+        let uploadCount = 0;
+        let successCount = 0;
+
         for (const file of files) {
             let xhr = new XMLHttpRequest();
-            {% if commit != "buffer" %}
-                xhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", false);
-                xhr.send();
-                xhr = new XMLHttpRequest();
+
+            {% if not buffer %}
+            let initXhr = new XMLHttpRequest();
+            initXhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", false);
+            initXhr.send();
             {% endif %}
+
             let formData = new FormData();
             formData.append("name", file.name);
             formData.append("file", file);
+
             {% if folders %}
                 xhr.open("POST", "/{{ folders | join("/") }}/post_file", true);
             {% else %}
                 xhr.open("POST", "/post_file", true);
             {% endif %}
             xhr.send(formData);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState == 4) {
-                    {% if commit != "buffer" %}
-                        window.location.href = "/buffer";
-                    {% endif %}
-                    window.location.reload();
+
+            xhr.onload = () => {
+                {% if not buffer %}
+                    window.location.href = "/buffer";
+                {% endif %}
+                uploadCount++;
+                if (xhr.status === 200) successCount++;
+
+                if (uploadCount === files.length) {
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            };
+
+            xhr.onerror = () => {
+                uploadCount++;
+                if (uploadCount === files.length) {
+                    setTimeout(() => window.location.reload(), 500);
                 }
             };
         }
     }
 
-    // Добавляем стиль для ошибки
-    const style = document.createElement('style');
-    style.textContent = `
-        .error {
-            border-color: #d9534f !important;
-            box-shadow: 0 0 5px rgba(217, 83, 79, 0.3) !important;
-        }
-    `;
-    document.head.appendChild(style);
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+        document.getElementById('fileInput').click();
+    });
 
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFiles(e.target.files);
+        }
+    });
+
+    // ========== КОММИТ ==========
+    const commitModal = document.getElementById('commitModal');
+    const commitMessage = document.getElementById('commitMessage');
+
+    function openCommitModal() {
+        commitMessage.value = '';
+        commitModal.style.display = 'block';
+        commitMessage.focus();
+    }
+
+    function closeCommitModal() {
+        commitModal.style.display = 'none';
+    }
+
+    document.getElementById('commitBtn').addEventListener('click', openCommitModal);
+
+    function sendCommit() {
+        const message = commitMessage.value.trim();
+
+        if (!message) {
+            commitMessage.focus();
+            return;
+        }
+
+        let formData = new FormData();
+        formData.append("message", message);
+
+        let xhr = new XMLHttpRequest();
+        xhr.open("POST", "/create_commit", true);
+        xhr.send(formData);
+
+        xhr.onload = () => {
+            if (xhr.status === 200) {
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('show_branch', nickname=nickname, repository=repository, branch=branch) }}";
+                }, 500);
+            }
+        };
+
+        closeCommitModal();
+    }
+
+    // ========== СОЗДАНИЕ ПАПКИ ==========
+    const folderModal = document.getElementById('folderModal');
+    const folderNameInput = document.getElementById('folderName');
+
+    function isValidFolderName(name) {
+        return name && /^[a-zA-Zа-яА-Я0-9_\-\.]+$/.test(name.trim());
+    }
+
+    function openFolderModal() {
+        folderNameInput.value = '';
+        folderNameInput.classList.remove('error');
+        folderModal.style.display = 'block';
+        folderNameInput.focus();
+    }
+
+    function closeFolderModal() {
+        folderModal.style.display = 'none';
+    }
+
+    document.getElementById('createFolderBtn').addEventListener('click', openFolderModal);
+
+    function createFolder() {
+        const folderName = folderNameInput.value.trim();
+
+        if (!folderName) {
+            folderNameInput.classList.add('error');
+            folderNameInput.focus();
+            return;
+        }
+
+        if (!isValidFolderName(folderName)) {
+            folderNameInput.classList.add('error');
+            folderNameInput.focus();
+            return;
+        }
+
+        const existingNames = [
+            {% for pos in dr %}
+                "{{ pos[0] }}",
+            {% endfor %}
+        ];
+
+        if (existingNames.includes(folderName)) {
+            folderNameInput.classList.add('error');
+            folderNameInput.focus();
+            return;
+        }
+
+        {% if not buffer %}
+        let initXhr = new XMLHttpRequest();
+        initXhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", false);
+        initXhr.send();
+        {% endif %}
+
+        let xhr = new XMLHttpRequest();
+        let formData = new FormData();
+        formData.append("folderName", folderName);
+
+        let url = "";
+        {% if folders %}
+            url = "/{{ folders | join("/") }}/create_folder";
+        {% else %}
+            url = "/create_folder";
+        {% endif %}
+
+        xhr.open("POST", url, true);
+        xhr.send(formData);
+
+        xhr.onload = () => {
+            {% if not buffer %}
+                window.location.href = "/buffer";
+            {% endif %}
+            if (xhr.status === 200) {
+                setTimeout(() => window.location.reload(), 500);
+            }
+        };
+
+        closeFolderModal();
+    }
+
+    // ========== СКАЧИВАНИЕ ==========
+    document.querySelectorAll('.download-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const filename = this.dataset.filename;
+            const isFile = this.dataset.isfile === '1';
+
+            const url = isFile
+                ? "{{ url_for('download_file', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=folders | join('/'), filename='') }}" + filename
+                : "{{ url_for('download_folder', nickname=nickname, repository=repository, branch=branch, sha1=commit, folders=folders | join('/'), filename='') }}" + filename;
+
+            window.location.href = url;
+        });
+    });
+
+    // ========== ЗАКРЫТИЕ МОДАЛЬНЫХ ОКОН ==========
+    function setupModalHandlers() {
+        // Удаление файла
+        document.querySelectorAll('.close-delete-modal, .cancel-delete-btn').forEach(el => {
+            el.addEventListener('click', closeDeleteModal);
+        });
+
+        document.querySelector('.confirm-delete-btn')?.addEventListener('click', () => {
+            if (confirmDeleteCallback) confirmDeleteCallback();
+            closeDeleteModal();
+        });
+
+        // Коммит
+        document.querySelectorAll('.close-commit-modal, .cancel-commit-btn').forEach(el => {
+            el.addEventListener('click', closeCommitModal);
+        });
+
+        document.querySelector('.confirm-commit-btn')?.addEventListener('click', sendCommit);
+
+        // Создание папки
+        document.querySelectorAll('.close-folder-modal, .cancel-folder-btn').forEach(el => {
+            el.addEventListener('click', closeFolderModal);
+        });
+
+        document.querySelector('.confirm-folder-btn')?.addEventListener('click', createFolder);
+
+        // Очистка буфера
+        document.querySelectorAll('.close-buffer-modal, .cancel-buffer-btn').forEach(el => {
+            el.addEventListener('click', closeClearBufferModal);
+        });
+
+        document.querySelector('.confirm-buffer-btn')?.addEventListener('click', () => {
+             console.log("AAAAAAAA");
+            let xhr = new XMLHttpRequest();
+            const url = "{{ url_for('delete_buffer') }}";
+            xhr.open("DELETE", url, true);
+            xhr.send();
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('repositories_list', nickname=nickname) }}";
+                    }, 500);
+                }
+            };
+            closeClearBufferModal();
+        });
+
+        // Закрытие при клике вне модального окна
+        window.onclick = function(event) {
+            if (event.target === deleteFileModal) closeDeleteModal();
+            if (event.target === commitModal) closeCommitModal();
+            if (event.target === folderModal) closeFolderModal();
+            if (event.target === clearBufferModal) closeClearBufferModal();
+        };
+
+        // Закрытие по ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDeleteModal();
+                closeCommitModal();
+                closeFolderModal();
+                closeClearBufferModal();
+            }
+        });
+    }
+
+    // Инициализация
+    setupModalHandlers();
+
+    // Убираем класс error при вводе
+    folderNameInput?.addEventListener('input', () => {
+        folderNameInput.classList.remove('error');
+    });
 </script>
 
 {% endblock %}

@@ -5,22 +5,13 @@
     <a class="btn-action btn-back" href="{{ url_for('show_repository', nickname=current_user.nickname, repository=repository) }}"><i
             class="bi bi-arrow-left"></i>Назад</a>
 </p>
-<h1>Создание ветки</h1>
+<h1>Добавление пользователя в репозиторий</h1>
 <form action="" method="post">
     {{ form.hidden_tag() }}
     <p>
-        {{ form.parent.label }}<br>
-        {{ form.parent(class="form-control")}}<br>
-        {% for error in form.title.errors %}
-            <p class="alert alert-danger" role="alert">
-                {{ error }}
-            </p>
-        {% endfor %}
-    </p>
-    <p>
-        {{ form.title.label }}<br>
-        {{ form.title(class="form-control")}}<br>
-        {% for error in form.title.errors %}
+        {{ form.login.label }}<br>
+        {{ form.login(class="form-control")}}<br>
+        {% for error in form.login.errors %}
             <p class="alert alert-danger" role="alert">
                 {{ error }}
             </p>

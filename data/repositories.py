@@ -6,9 +6,9 @@ from .db_session import SqlAlchemyBase
 repositories_to_users = sqlalchemy.Table(
     "repositories_to_users",
     SqlAlchemyBase.metadata,
-    sqlalchemy.Column("coauthors", sqlalchemy.Integer,
+    sqlalchemy.Column("coauthors_id", sqlalchemy.Integer,
                       sqlalchemy.ForeignKey("users.id")),
-    sqlalchemy.Column("repositories", sqlalchemy.Integer,
+    sqlalchemy.Column("repositories_id", sqlalchemy.Integer,
                       sqlalchemy.ForeignKey("repositories.id"))
 )
 
@@ -22,3 +22,6 @@ class Repositories(SqlAlchemyBase):
     author_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id"), nullable=True)
     branches = orm.relationship("Branches", back_populates="repository")
     user = orm.relationship("User")
+    coauthors = orm.relationship("User",
+                                  secondary="repositories_to_users",
+                                  back_populates="coauthorship")

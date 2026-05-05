@@ -1,31 +1,124 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style.css') }}"/>
-    <script src="{{ url_for('static', filename='scripts/script.js') }}"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/themes.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style.css') }}">
+    <script src="{{ url_for('static', filename='scripts/script.js') }}" defer></script>
     <title>{{ title }}</title>
 </head>
 <body>
 
-<header>
-    <h1><a href="{{ url_for('index') }}">DemCoHub</a></h1>
+<header class="custom-header">
+    <div class="container flex-between">
+        <div class="logo">
+            <a href="{{ url_for('index') }}">
+                <i class="bi bi-mic"></i> DemCoHub
+            </a>
+        </div>
+
+        <div class="nav-links">
+            {% if current_user.is_authenticated %}
+                <div class="user-info">
+                    <div class="user-avatar">
+                        {{ current_user.nickname[0]|upper }}
+                    </div>
+                    <a class="user-name" href="{{ url_for('profile', nickname=current_user.nickname) }}">
+                        {{ current_user.nickname }}
+                    </a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger"
+                       onclick="return confirm('Вы уверены, что хотите выйти?')">
+                        <i class="bi bi-box-arrow-right"></i> Выйти
+                    </a>
+                </div>
+            {% else %}
+                <div class="auth-buttons">
+                    <a class="btn-auth btn-register" href="{{ url_for('register') }}">
+                        <i class="bi bi-person-plus"></i> Регистрация
+                    </a>
+                    <a class="btn-auth btn-login" href="{{ url_for('login') }}">
+                        <i class="bi bi-box-arrow-in-right"></i> Вход
+                    </a>
+                </div>
+            {% endif %}
+
+            <div class="theme-switch-wrapper">
+                <label class="theme-switch" for="checkbox">
+                    <input type="checkbox" id="checkbox" />
+                    <div class="slider">
+                        <i class="bi bi-sun"></i>
+                        <i class="bi bi-moon"></i>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
 </header>
 
-{% if current_user.is_authenticated %}
-    <a class="navbar-brand" href="{{ url_for('profile', nickname=current_user.nickname) }}">{{ current_user.nickname }}</a>
-{% else %}
-<p>
-    <a class="btn btn-primary " href="{{ url_for('register') }}">Регистрация</a>
-    <a class="btn btn-success" href="{{ url_for('login') }}">Вход</a>
-</p>
-{% endif %}
+<main class="main-content">
+    <div class="container">
+        <div class="content-wrapper">
+            {% block content %}
+            {% endblock %}
+        </div>
+    </div>
+</main>
 
-{% block content %}
-{% endblock %}
+<script>
+    function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
 
+        const checkbox = document.getElementById('checkbox');
+        if (checkbox) {
+            checkbox.checked = theme === 'dark';
+        }
+
+        document.body.style.transition = 'background 0.3s ease';
+    }
+
+    function toggleTheme() {
+        const currentTheme = document.body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+    }
+
+    function loadTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else if (prefersDark) {
+            setTheme('dark');
+        } else {
+            setTheme('light');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTheme();
+
+        const checkbox = document.getElementById('checkbox');
+        if (checkbox) {
+            checkbox.addEventListener('change', toggleTheme);
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-imp1sF5lWQqCkC6kPfiC6jx/3VQB7eHhViYhU7+uyV7pLw2kIP1uE8P7kIlhe+"
+        crossorigin="anonymous"></script>
 </body>
 </html>

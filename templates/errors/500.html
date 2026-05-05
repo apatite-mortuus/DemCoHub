@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="error-container text-center">
+        <div class="error-code animate__animated animate__fadeInUp">
+            <h1 class="display-1 fw-bold text-warning">500</h1>
+        </div>
+        
+        <div class="error-content animate__animated animate__fadeInUp animate__delay-1s">
+            <div class="error-icon mb-4">
+                <i class="bi bi-exclamation-triangle display-1 text-muted"></i>
+            </div>
+            
+            <h2 class="mb-3">Внутренняя ошибка сервера</h2>
+            
+            <p class="text-muted mb-4">
+                Извините, на сервере произошла ошибка. Мы уже работаем над её устранением.
+                Пожалуйста, попробуйте позже или свяжитесь с администратором.
+            </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

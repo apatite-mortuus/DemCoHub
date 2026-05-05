@@ -2,6 +2,10 @@
 
 {% block content %}
 <h1>Создание репозитория</h1>
+<p>
+    <a class="btn-action btn-back" href="{{ url_for('repositories_list', nickname=current_user.nickname) }}"><i
+            class="bi bi-arrow-left"></i>Назад</a>
+</p>
 <form action="" method="post">
     {{ form.hidden_tag() }}
     <p>

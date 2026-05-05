@@ -1,53 +1,164 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="container py-4">
+    <div class="section-header">
+        {% if current_user.is_authenticated %}
+            <a class="btn btn-primary" href="{{ url_for('post_audio') }}">
+                <i class="bi bi-cloud-upload"></i> Опубликовать новую аудиозапись
+            </a>
+        {% endif %}
+    </div>
 
-{% if current_user.is_authenticated %}
-<p>
-    <a class="btn btn-primary" href="{{ url_for('post_audio') }}">Опубликовать новую аудиозапись</a>
-</p>
-{% endif %}
+    <!-- Заголовок раздела с аудиозаписями -->
+    <div class="section-header">
+        <h2>
+            <i class="bi bi-music-note-beamed"></i> Новые аудиозаписи
+        </h2>
+    </div>
 
-<h1>Новые аудиозаписи:</h1>
-<table class="table">
-    <thead>
-    <tr class="table-secondary">
-        <th>Название</th>
-        <th>Аудиофайл</th>
-        <th>Автор</th>
-        <th>Опубликовал</th>
-        <th>Дата публикации</th>
-        <th>Оценки:</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for file in files %}
-    <tr class="table-secondary">
-        <td>{{ file.title }}</td>
-        <td>
-            <audio src="{{ file.path_to_file }}" controls></audio>
-        </td>
-        <td>{{ file.author }}</td>
-        <td>{{ file.user.nickname }}</td>
-        <td>{{ file.date_time }}</td>
-        <td>
-            <button class="like" data-id="{{ file.id }}"
-                    {% if not current_user.is_authenticated %} disabled {% endif %}>like {{ file.likes|length }}
-            </button>
-            <button class="dislike" data-id="{{ file.id }}"
-                    {% if not current_user.is_authenticated %} disabled {% endif %}>dislike {{ file.dislikes|length }}
-            </button>
-            {% if current_user.is_authenticated and current_user.id == file.posted %}
-            <div>
-                <a href="{{ url_for('audio_delete', id=file.id) }}" class="btn btn-danger">
-                    Удалить
-                </a>
-            </div>
-            {% endif %}
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
+    {% if files %}
+        <!-- Таблица аудиозаписей -->
+        <div class="table-responsive audio-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-music-note"></i> Название</th>
+                        <th><i class="bi bi-file-earmark-music"></i> Аудиофайл</th>
+                        <th><i class="bi bi-person"></i> Автор</th>
+                        <th><i class="bi bi-person-badge"></i> Опубликовал</th>
+                        <th><i class="bi bi-calendar"></i> Дата публикации</th>
+                        <th><i class="bi bi-hand-thumbs-up"></i> Оценки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in files %}
+                    <tr>
+                        <td data-label="Название">
+                            <strong>{{ file.title }}</strong>
+                        </td>
+                        <td data-label="Аудиофайл">
+                            <audio src="{{ file.path_to_file }}" controls preload="metadata"></audio>
+                        </td>
+                        <td data-label="Автор">
+                            <i class="bi bi-person-circle"></i> {{ file.author }}
+                        </td>
+                        <td data-label="Опубликовал">
+                            <a href="{{ url_for('profile', nickname=file.user.nickname) }}"
+                               class="text-decoration-none">
+                                {{ file.user.nickname }}
+                            </a>
+                        </td>
+                        <td data-label="Дата публикации">
+                            <i class="bi bi-clock"></i> {{ file.date_time[:-7] }}
+                        </td>
+                        <td data-label="Оценки">
+                            <div class="action-buttons">
+                                <div class="vote-buttons">
+                                    <button class="btn btn-sm btn-outline-success btn-vote like"
+                                            data-id="{{ file.id }}"
+                                            {% if not current_user.is_authenticated %} disabled {% endif %}>
+                                        <i class="bi bi-hand-thumbs-up"></i>
+                                        <span class="like-count">{{ file.likes|length }}</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger btn-vote dislike"
+                                            data-id="{{ file.id }}"
+                                            {% if not current_user.is_authenticated %} disabled {% endif %}>
+                                        <i class="bi bi-hand-thumbs-down"></i>
+                                        <span class="dislike-count">{{ file.dislikes|length }}</span>
+                                    </button>
+                                </div>
+                                {% if current_user.is_authenticated and current_user.id == file.posted %}
+                                    <a href="{{ url_for('audio_delete', id=file.id) }}"
+                                       class="btn btn-sm btn-danger btn-delete"
+                                       onclick="return confirm('Вы уверены, что хотите удалить эту запись?')">
+                                        <i class="bi bi-trash"></i> Удалить
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <!-- Пустое состояние -->
+        <div class="empty-state">
+            <i class="bi bi-music-note"></i>
+            <h4>Пока нет аудиозаписей</h4>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // Функция обновления счетчика
+    function updateCounter(btn, delta) {
+        const span = btn.querySelector('span');
+        if (span) {
+            const currentCount = parseInt(span.textContent);
+            if (!isNaN(currentCount)) {
+                span.textContent = currentCount + delta;
+            }
+        }
+    }
+
+    // Функция для AJAX запросов с улучшенной обработкой
+    function sendVote(endpoint, btn, deltaSuccess, deltaError) {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("id", btn.dataset.id);
+
+        // Сохраняем исходный текст
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+
+        xhr.open("POST", endpoint);
+        xhr.send(formData);
+
+        xhr.onload = () => {
+            try {
+                const response = JSON.parse(xhr.response);
+                if (response.response === "created") {
+                    updateCounter(btn, deltaSuccess);
+                } else if (response.response === "deleted") {
+                    updateCounter(btn, deltaError);
+                }
+            } catch (e) {
+                console.error('Ошибка парсинга ответа:', e);
+            }
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        };
+
+        xhr.onerror = () => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        };
+    }
+
+
+    // Обработчики лайков
+    const likeBtns = document.querySelectorAll(".like");
+    likeBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sendVote("/like", btn, 1, -1);
+        });
+    });
+
+    // Обработчики дизлайков
+    const dislikeBtns = document.querySelectorAll(".dislike");
+    dislikeBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sendVote("/dislike", btn, 1, -1);
+        });
+    });
+
+</script>
 
 {% endblock %}

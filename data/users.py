@@ -20,7 +20,7 @@ class User(SqlAlchemyBase, UserMixin):
     buffer = orm.relationship("Buffers", back_populates="user")
     coauthorship = orm.relationship("Repositories",
                                   secondary="repositories_to_users",
-                                  backref="users")
+                                  back_populates="coauthors")
 
     def set_password(self, password):
         self.hashed_password = generate_password_hash(password)
