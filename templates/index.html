@@ -10,7 +10,6 @@
         {% endif %}
     </div>
 
-    <!-- Заголовок раздела с аудиозаписями -->
     <div class="section-header">
         <h2>
             <i class="bi bi-music-note-beamed"></i> Новые аудиозаписи
@@ -18,7 +17,6 @@
     </div>
 
     {% if files %}
-        <!-- Таблица аудиозаписей -->
         <div class="table-responsive audio-table">
             <table class="table">
                 <thead>
@@ -83,7 +81,6 @@
             </table>
         </div>
     {% else %}
-        <!-- Пустое состояние -->
         <div class="empty-state">
             <i class="bi bi-music-note"></i>
             <h4>Пока нет аудиозаписей</h4>
@@ -92,7 +89,6 @@
 </div>
 
 <script>
-    // Функция обновления счетчика
     function updateCounter(btn, delta) {
         const span = btn.querySelector('span');
         if (span) {
@@ -103,13 +99,11 @@
         }
     }
 
-    // Функция для AJAX запросов с улучшенной обработкой
     function sendVote(endpoint, btn, deltaSuccess, deltaError) {
         const xhr = new XMLHttpRequest();
         const formData = new FormData();
         formData.append("id", btn.dataset.id);
 
-        // Сохраняем исходный текст
         const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.style.opacity = '0.6';
@@ -139,7 +133,6 @@
     }
 
 
-    // Обработчики лайков
     const likeBtns = document.querySelectorAll(".like");
     likeBtns.forEach((btn) => {
         btn.addEventListener("click", (e) => {
@@ -149,7 +142,6 @@
         });
     });
 
-    // Обработчики дизлайков
     const dislikeBtns = document.querySelectorAll(".dislike");
     dislikeBtns.forEach((btn) => {
         btn.addEventListener("click", (e) => {

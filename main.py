@@ -8,6 +8,7 @@ import shutil
 
 from flask import Flask, render_template, redirect, request, url_for, abort, jsonify, send_file
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
+from flask_restful import Api
 
 from data.users import User
 from data.audiofiles import Audiofile
@@ -17,7 +18,7 @@ from data.repositories import Repositories
 from data.branches import Branches
 from data.commits import Commits
 from data.buffers import Buffers
-from data import db_session
+from data import db_session, user_resource, audiofile_resource
 from forms.login_form import LoginForm
 from forms.register_form import RegisterForm
 from forms.post_audio_form import PostAudioForm
@@ -26,6 +27,7 @@ from forms.branch_form import BranchForm
 from forms.add_to_repository_form import AddToRepository
 
 app = Flask(__name__)
+api = Api(app)
 app.config["SECRET_KEY"] = secrets.token_urlsafe(32)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -42,7 +44,8 @@ def load_user(user_id):
 def index():
     with db_session.create_session() as db_sess:
         files = db_sess.query(Audiofile).all()
-        return render_template("index.html", files=files, title="Главная | DemCoHub")
+        return render_template("index.html",
+                               files=files, title="Главная | DemCoHub")
 
 
 @app.route("/like", methods=["POST"])
@@ -236,6 +239,7 @@ def create_repository():
 
 
 @app.route("/<nickname>/repositories")
+@login_required
 def repositories_list(nickname):
     with db_session.create_session() as db_sess:
         repos = db_sess.query(Repositories).join(Repositories.user).filter(User.nickname == nickname).all()
@@ -245,6 +249,7 @@ def repositories_list(nickname):
 
 
 @app.route("/<nickname>/coauthorship")
+@login_required
 def coauthorship_repositories(nickname):
     with db_session.create_session() as db_sess:
         repos = db_sess.query(Repositories).join(Repositories.coauthors).filter(User.nickname == nickname).all()
@@ -254,6 +259,7 @@ def coauthorship_repositories(nickname):
 
 
 @app.route("/add_to_repository/<repository>", methods=["GET", "POST"])
+@login_required
 def add_to_repository(repository):
     form = AddToRepository()
     if form.validate_on_submit():
@@ -276,6 +282,7 @@ def add_to_repository(repository):
 
 
 @app.route("/<nickname>/repositories/<repository>")
+@login_required
 def show_repository(nickname, repository):
     with db_session.create_session() as db_sess:
         repo = db_sess.query(Repositories).join(Repositories.user).filter(Repositories.title == repository,
@@ -289,6 +296,7 @@ def show_repository(nickname, repository):
 
 
 @app.route("/<nickname>/repositories/<repository>/<branch>")
+@login_required
 def show_branch(nickname, repository, branch):
     with db_session.create_session() as db_sess:
         repo = db_sess.query(Repositories).join(Repositories.user).filter(Repositories.title == repository,
@@ -321,7 +329,7 @@ def create_branch(repository):
                 title=form.title.data,
                 repository_id=repo.id,
                 commits=db_sess.query(Branches).filter(Branches.title == form.parent.data,
-                                                    Branches.repository_id == repo.id).first().commits
+                                                       Branches.repository_id == repo.id).first().commits
             )
             db_sess.add(branch)
             db_sess.commit()
@@ -432,7 +440,7 @@ def create_buffer(nickname, repository, branch, sha1):
             buffer = Buffers(
                 user_id=db_sess.query(User).filter(User.nickname == current_user.nickname).first().id,
                 branch_id=db_sess.query(Branches).join(Branches.repository).join(Repositories.user).filter(
-                    Branches.title == branch, User.nickname == nickname).first().id
+                    Branches.title == branch, Repositories.title == repository, User.nickname == nickname).first().id
             )
             db_sess.add(buffer)
             db_sess.commit()
@@ -533,6 +541,11 @@ def bad_request(error):
 def unauthorized(error):
     return render_template('errors/401.html', title="401 | DemCoHub"), 401
 
+
+api.add_resource(user_resource.UserListResource, '/api/users')
+api.add_resource(user_resource.UserResource, '/api/users/<int:user_id>')
+api.add_resource(audiofile_resource.AudiofileListResource, '/api/audiofiles')
+api.add_resource(audiofile_resource.AudiofileResource, '/api/audiofiles/<int:file_id>')
 
 if __name__ == "__main__":
     db_session.global_init("database/users.db")
