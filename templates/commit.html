@@ -225,12 +225,9 @@
 </div>
 
 <script>
-    // Переменные для хранения состояния
     let currentFileName = null;
     let currentIsFile = null;
 
-
-    // ========== УДАЛЕНИЕ ФАЙЛА/ПАПКИ ==========
     const deleteFileModal = document.getElementById('deleteFileModal');
     const fileNameSpan = document.getElementById('fileNameToDelete');
     let confirmDeleteCallback = null;
@@ -261,7 +258,6 @@
                 formData.append("name", filename);
 
                 {% if not buffer %}
-                // Создаем буфер если нужно
                 let initXhr = new XMLHttpRequest();
                 initXhr.open("POST", "/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit }}/create_buffer", false);
                 initXhr.send();
@@ -278,7 +274,6 @@
         });
     });
 
-    // ========== ОЧИСТКА БУФЕРА ==========
     const clearBufferModal = document.getElementById('clearBufferModal');
 
     function openClearBufferModal() {
@@ -293,7 +288,6 @@
         openClearBufferModal();
     });
 
-    // ========== ЗАГРУЗКА ФАЙЛОВ ==========
     function handleFiles(files) {
         let uploadCount = 0;
         let successCount = 0;
@@ -349,7 +343,6 @@
         }
     });
 
-    // ========== КОММИТ ==========
     const commitModal = document.getElementById('commitModal');
     const commitMessage = document.getElementById('commitMessage');
 
@@ -391,7 +384,6 @@
         closeCommitModal();
     }
 
-    // ========== СОЗДАНИЕ ПАПКИ ==========
     const folderModal = document.getElementById('folderModal');
     const folderNameInput = document.getElementById('folderName');
 
@@ -471,7 +463,6 @@
         closeFolderModal();
     }
 
-    // ========== СКАЧИВАНИЕ ==========
     document.querySelectorAll('.download-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -486,9 +477,7 @@
         });
     });
 
-    // ========== ЗАКРЫТИЕ МОДАЛЬНЫХ ОКОН ==========
     function setupModalHandlers() {
-        // Удаление файла
         document.querySelectorAll('.close-delete-modal, .cancel-delete-btn').forEach(el => {
             el.addEventListener('click', closeDeleteModal);
         });
@@ -498,27 +487,23 @@
             closeDeleteModal();
         });
 
-        // Коммит
         document.querySelectorAll('.close-commit-modal, .cancel-commit-btn').forEach(el => {
             el.addEventListener('click', closeCommitModal);
         });
 
         document.querySelector('.confirm-commit-btn')?.addEventListener('click', sendCommit);
 
-        // Создание папки
         document.querySelectorAll('.close-folder-modal, .cancel-folder-btn').forEach(el => {
             el.addEventListener('click', closeFolderModal);
         });
 
         document.querySelector('.confirm-folder-btn')?.addEventListener('click', createFolder);
 
-        // Очистка буфера
         document.querySelectorAll('.close-buffer-modal, .cancel-buffer-btn').forEach(el => {
             el.addEventListener('click', closeClearBufferModal);
         });
 
         document.querySelector('.confirm-buffer-btn')?.addEventListener('click', () => {
-             console.log("AAAAAAAA");
             let xhr = new XMLHttpRequest();
             const url = "{{ url_for('delete_buffer') }}";
             xhr.open("DELETE", url, true);
@@ -533,7 +518,6 @@
             closeClearBufferModal();
         });
 
-        // Закрытие при клике вне модального окна
         window.onclick = function(event) {
             if (event.target === deleteFileModal) closeDeleteModal();
             if (event.target === commitModal) closeCommitModal();
@@ -541,7 +525,6 @@
             if (event.target === clearBufferModal) closeClearBufferModal();
         };
 
-        // Закрытие по ESC
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeDeleteModal();
@@ -552,10 +535,8 @@
         });
     }
 
-    // Инициализация
     setupModalHandlers();
 
-    // Убираем класс error при вводе
     folderNameInput?.addEventListener('input', () => {
         folderNameInput.classList.remove('error');
     });

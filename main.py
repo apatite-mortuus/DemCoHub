@@ -112,14 +112,19 @@ def register():
 @app.route('/login', methods=["GET", "POST"])
 def login():
     form = LoginForm()
+    # Если форма отправлена:
     if form.validate_on_submit():
         with db_session.create_session() as db_sess:
+            # Запрос к базе данных
+            # Первый пользователь, у которого совпадают почта или псевдоним с соответствующими из БД
             user = db_sess.query(User).filter(
                 (User.email == form.login.data) | (User.nickname == form.login.data)).first()
-            print(user)
+            # Если пользователь существует и пароли совпадают
             if user and user.check_password(form.password.data):
+                # Авторизация с помощью flask-login
                 login_user(user, remember=form.remember_me.data)
                 return redirect("/")
+            # Иначе
             return render_template('login_form.html', message="Неправильный логин или пароль", form=form,
                                    title='Авторизация | DemCoHub')
     return render_template('login_form.html', title='Авторизация | DemCoHub', form=form)
@@ -155,7 +160,6 @@ def post_audio():
                     i = 1
                     while True:
                         try:
-                            print(i)
                             with open(
                                     f"static/upload/public_audio/{img.filename.rsplit(".", 1)[0]} ({i}).{img.filename.rsplit(".", 1)[1]}",
                                     "xb") as f:
@@ -191,7 +195,6 @@ def profile(nickname):
         if user:
             files = user.audiofile
             buffer = user.buffer
-            print(buffer)
             if not current_user.is_authenticated or current_user.nickname != nickname:
                 return render_template("profile.html", files=files, title=f"{nickname} | DemCoHub", user=nickname,
                                        buffer=buffer)
@@ -268,7 +271,6 @@ def add_to_repository(repository):
                 (form.login.data == User.nickname) | (form.login.data == User.email)).first()
             repository = db_sess.query(Repositories).join(Repositories.user).filter(repository == Repositories.title,
                                                                                     User.id == current_user.id).first()
-            print(user.coauthorship)
             if repository in user.coauthorship:
                 return render_template("add_to_repository_form.html",
                                        title="Добавление пользователя в репозиторий | DemCoHub",
@@ -303,10 +305,7 @@ def show_branch(nickname, repository, branch):
                                                                           User.nickname == nickname).first()
         coauthors = repo.coauthors
         br = [b for b in repo.branches if b.title == branch][0]
-        print(br)
-        print(coauthors)
         commits = br.commits
-        print(commits)
         if current_user.nickname != nickname and current_user not in coauthors:
             return abort(403)
         return render_template("branch.html", nickname=nickname, repository=repository, branch=branch, commits=commits,
